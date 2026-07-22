@@ -133,6 +133,10 @@ Assets live in `game/src/main/resources` and load via the classpath:
 
 `ENGINE.md` is the feature inventory (what's implemented) plus the prioritized roadmap toward a full game engine. Consult it before proposing large features so new work fits the intended direction.
 
+## Skills
+
+`.claude/skills/game-spec/` — a skill (`/game-spec`) that writes a build-ready design spec for a new game on this engine (grounded in the real capabilities above) to `docs/specs/<slug>.md`, then offers to build it. Use it to plan a dedicated game before implementing.
+
 ## Gotchas
 
 - **macOS threading:** GLFW requires `-XstartOnFirstThread` (handled in `build.gradle` for the `run` task). See the IDE note above.
