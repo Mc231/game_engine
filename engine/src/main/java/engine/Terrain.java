@@ -12,6 +12,7 @@ package engine;
 public class Terrain implements Disposable {
 
     private final Mesh mesh;
+    private final Noise noise;
     public final float size;
     public final float maxHeight;
 
@@ -19,7 +20,7 @@ public class Terrain implements Disposable {
         this.size = size;
         this.maxHeight = maxHeight;
 
-        Noise noise = new Noise(seed);
+        this.noise = new Noise(seed);
         int n = resolution;
         float half = size / 2f;
         float step = size / (n - 1);
@@ -83,8 +84,13 @@ public class Terrain implements Disposable {
         mesh = new Mesh(vertices, new int[]{3, 3}, indices);
     }
 
+    /** Elevation at world (x, z) using this terrain's noise (e.g. for collision). */
+    public float heightAt(float x, float z) {
+        return heightAt(noise, x, z, maxHeight);
+    }
+
     /** Elevation at world (x, z): fBm remapped to 0..1 then sharpened into peaks. */
-    private static float heightAt(Noise noise, float x, float z, float maxHeight) {
+    public static float heightAt(Noise noise, float x, float z, float maxHeight) {
         double n = noise.fbm(x * 0.008, z * 0.008, 6, 2.0, 0.5);   // -1..1
         double t = (n + 1.0) * 0.5;                                 // 0..1
         t = Math.pow(t, 2.2);                                       // flat valleys, sharp peaks

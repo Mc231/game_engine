@@ -4,19 +4,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A small 3D game engine built on **LWJGL 3.3.4** (OpenGL + GLFW) with **JOML** for math, plus a set of demo scenes that exercise it. Java 17, Gradle. The engine lives in the `engine` package; runnable demos live in `scenes`.
+A small 3D game engine built on **LWJGL 3.3.4** (OpenGL + GLFW) with **JOML** for math, plus a set of demo scenes that exercise it. Java 17, Gradle **multi-module**: the reusable engine is the `:engine` module (a `java-library`); the runnable game/demos are the `:game` module (an `application` that depends on `:engine`). The module boundary is compile-enforced — engine code cannot import game code.
 
 ## Build & run
 
 ```bash
-./gradlew run          # build + launch (starts on scene 1)
-./gradlew build        # compile + assemble
-./gradlew compileJava  # fast compile-only check
+./gradlew run             # build + launch (resolves to :game:run; starts on scene 1)
+./gradlew build           # compile + assemble both modules
+./gradlew :engine:compileJava   # fast compile-only check of the engine
+./gradlew :game:compileJava     # fast compile-only check of the game
 ```
 
-There are **no tests** in this project. Verification is done by running the app: a successful launch that stays open means shaders compiled, resources loaded, and framebuffers are complete. Scenes create all their GPU resources in `init()`, so a broken scene throws there and exits immediately.
+### Tests
 
-**Testing a specific scene from the CLI:** the app opens a GUI window and blocks until closed. To verify a scene non-interactively, temporarily make it the **first** entry in the scene list in `src/main/java/Main.java` (only the current scene's `init()` runs), then:
+```bash
+./gradlew :engine:test    # JUnit 5 unit tests
+```
+
+Unit tests (in `:engine`) cover the **pure-logic** classes only — no OpenGL context needed: `OBJLoader.parse`, `Noise`/`Terrain` height math, `Transform`/`Camera` math, `WindowConfig`, `Light`, `Geometry`.
+
+**GL-dependent classes** (`Mesh`, `ShaderProgram`, `Texture`, `ShadowMap`, `Engine`) need a live context and are intentionally **not** unit-tested — they're verified by running the app (see below). When adding testable logic, keep it separable from GL calls, following the existing split: `OBJLoader.parse(String)` returns data / `OBJLoader.load()` uploads it; `Terrain.heightAt(...)` is a pure static function.
+
+### Verify by running
+
+A successful launch that stays open means shaders compiled, resources loaded, and framebuffers are complete. Scenes create all their GPU resources in `init()`, so a broken scene throws there and exits immediately.
+
+**Testing a specific scene from the CLI:** the app opens a GUI window and blocks until closed. To verify a scene non-interactively, temporarily make it the **first** entry in the scene list in `game/src/main/java/Main.java` (only the current scene's `init()` runs), then:
 ```bash
 timeout 10 ./gradlew run --console=plain; echo "exit=$?"   # exit=124 (timed out = stayed open) means success
 ```
@@ -28,15 +41,14 @@ Do **not** use the green-arrow "run `main()`" — on macOS it fails with exit 1 
 
 ## Platform natives
 
-`build.gradle` auto-detects the OS/arch and selects the matching LWJGL native classifier (`natives-macos-arm64`, `natives-windows`, `natives-linux`, etc.), so no manual config is needed to build on a new machine.
+`engine/build.gradle` auto-detects the OS/arch and selects the matching LWJGL native classifier (`natives-macos-arm64`, `natives-windows`, `natives-linux`, etc.), so no manual config is needed to build on a new machine. The LWJGL Java bindings + JOML are `api` dependencies of `:engine` (so `:game` gets them on its compile classpath); the natives are `runtimeOnly` (they propagate to `:game`'s runtime classpath automatically).
 
 ## Architecture
 
-Three source areas under `src/main/java`:
+Two Gradle modules:
 
-- **`engine/`** — the reusable engine. No dependencies on `scenes` or `Main`.
-- **`scenes/`** — one class per demo, each implementing `engine.Scene`. This is the "content."
-- **`Main.java`** (default package) — the only entry point; builds a `WindowConfig` and hands the `Engine` an ordered `List<Scene>`.
+- **`:engine`** (`engine/src/main/java/engine/`) — the reusable engine library. Depends on nothing in the game; the module boundary makes an engine→game import a compile error.
+- **`:game`** (`game/src/main/java/`) — depends on `:engine`. Contains `Main` (default package; the entry point that builds a `WindowConfig` and hands the `Engine` an ordered `List<Scene>`), the `scenes/` package (one class per demo, each implementing `engine.Scene`), and the resources.
 
 ### The core loop and scene model
 
@@ -71,7 +83,7 @@ Uniforms a given shader doesn't declare are silently ignored (location `-1`), wh
 
 ## Resources
 
-Assets live in `src/main/resources` and load via the classpath:
+Assets live in `game/src/main/resources` and load via the classpath:
 - `shaders/*.vert|*.frag` — loaded by `ShaderProgram.fromFiles`.
 - `textures/*.png` — loaded by `Texture` (stb_image; flips vertically, forces RGBA, builds mipmaps).
 - `models/*.obj` — loaded by `OBJLoader` (v/vt/vn/f, fan-triangulated, indexed).

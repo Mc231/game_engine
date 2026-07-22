@@ -1,1 +1,3 @@
 rootProject.name = 'lwjgl'
+
+include 'engine', 'game'

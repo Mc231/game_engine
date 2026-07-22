@@ -1,0 +1,29 @@
+// The game/demos app: depends on the engine and provides the entry point.
+plugins {
+    id 'application'
+}
+
+import org.gradle.internal.os.OperatingSystem
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':engine')
+}
+
+application {
+    mainClass = 'Main'
+
+    // macOS: GLFW must run on the process's first thread.
+    if (OperatingSystem.current().isMacOsX()) {
+        applicationDefaultJvmArgs = ['-XstartOnFirstThread']
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
