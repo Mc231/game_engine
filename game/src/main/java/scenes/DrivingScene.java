@@ -135,6 +135,9 @@ public class DrivingScene implements Scene {
     private int laps = 0;
     private boolean passedHalf = false;
     private float crashFlash = 0f;
+    private static final float COUNTDOWN_START = 3f;
+    private float countdown = COUNTDOWN_START;
+    private float goFlash = 0f;
 
     @Override
     public void init(Window window) {
@@ -199,43 +202,57 @@ public class DrivingScene implements Scene {
     public void update(float deltaSeconds) {
         gamepad.update();
 
-        float throttle = (actions.isDown("accel", input) ? 1f : 0f)
-                - (actions.isDown("reverse", input) ? 1f : 0f)
-                - deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_LEFT_Y));
-        float steer = (actions.isDown("left", input) ? 1f : 0f)
-                - (actions.isDown("right", input) ? 1f : 0f)
-                - deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_LEFT_X));
-        boolean brake = actions.isDown("brake", input) || gamepad.button(GLFW_GAMEPAD_BUTTON_B);
-
+        boolean racing = countdown <= 0f;
+        float throttle = 0f;
+        float steer = 0f;
+        boolean brake;
+        if (racing) {
+            throttle = (actions.isDown("accel", input) ? 1f : 0f)
+                    - (actions.isDown("reverse", input) ? 1f : 0f)
+                    - deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_LEFT_Y));
+            steer = (actions.isDown("left", input) ? 1f : 0f)
+                    - (actions.isDown("right", input) ? 1f : 0f)
+                    - deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_LEFT_X));
+            brake = actions.isDown("brake", input) || gamepad.button(GLFW_GAMEPAD_BUTTON_B);
+        } else {
+            countdown -= deltaSeconds;
+            if (countdown <= 0f) {
+                goFlash = 0.9f;      // just hit "GO!"
+            }
+            brake = true;            // keep the car planted at the line
+        }
         controller.update(deltaSeconds, clamp(throttle), clamp(steer), brake, terrain::heightAt);
 
-        // --- Time trial: nearest centerline point → off-track death + lap timing ---
-        lapTime += deltaSeconds;
+        if (goFlash > 0f) goFlash -= deltaSeconds;
         if (crashFlash > 0f) crashFlash -= deltaSeconds;
 
-        Vector3f p = controller.position();
-        int nearest = 0;
-        float bestSq = Float.MAX_VALUE;
-        for (int i = 0; i < centerline.length; i++) {
-            float dx = p.x - centerline[i].x;
-            float dz = p.z - centerline[i].z;
-            float d = dx * dx + dz * dz;
-            if (d < bestSq) {
-                bestSq = d;
-                nearest = i;
+        // --- Time trial: off-track death + lap timing (only once racing) ---
+        if (racing) {
+            lapTime += deltaSeconds;
+            Vector3f p = controller.position();
+            int nearest = 0;
+            float bestSq = Float.MAX_VALUE;
+            for (int i = 0; i < centerline.length; i++) {
+                float dx = p.x - centerline[i].x;
+                float dz = p.z - centerline[i].z;
+                float d = dx * dx + dz * dz;
+                if (d < bestSq) {
+                    bestSq = d;
+                    nearest = i;
+                }
             }
-        }
-        if ((float) Math.sqrt(bestSq) > OFF_TRACK) {
-            crash();
-        } else {
-            int half = centerline.length / 2;
-            if (nearest > half) {
-                passedHalf = true;
-            } else if (passedHalf && nearest < centerline.length * 0.06f) {
-                laps++;
-                if (bestLap < 0f || lapTime < bestLap) bestLap = lapTime;
-                lapTime = 0f;
-                passedHalf = false;
+            if ((float) Math.sqrt(bestSq) > OFF_TRACK) {
+                crash();
+            } else {
+                int half = centerline.length / 2;
+                if (nearest > half) {
+                    passedHalf = true;
+                } else if (passedHalf && nearest < centerline.length * 0.06f) {
+                    laps++;
+                    if (bestLap < 0f || lapTime < bestLap) bestLap = lapTime;
+                    lapTime = 0f;
+                    passedHalf = false;
+                }
             }
         }
 
@@ -313,8 +330,14 @@ public class DrivingScene implements Scene {
         hud.text(12, 74, 2f, (bestLap < 0f ? "best:   --" : String.format("best: %6.2f s", bestLap))
                 + "     lap " + laps, 0.6f, 1f, 0.7f);
         hud.text(12, 100, 2f, String.format("%3.0f km/h", kmh), 0.9f, 0.9f, 1f);
+        float cy = window.framebufferHeight() / 2f;
         if (crashFlash > 0f) {
-            hud.text(fbw / 2f - 150f, window.framebufferHeight() / 2f - 20f, 5f, "OFF TRACK!", 1f, 0.3f, 0.2f);
+            hud.text(fbw / 2f - 150f, cy - 90f, 5f, "OFF TRACK!", 1f, 0.3f, 0.2f);
+        }
+        if (countdown > 0f) {
+            hud.text(fbw / 2f - 25f, cy - 30f, 9f, String.valueOf((int) Math.ceil(countdown)), 1f, 0.9f, 0.3f);
+        } else if (goFlash > 0f) {
+            hud.text(fbw / 2f - 75f, cy - 30f, 9f, "GO!", 0.4f, 1f, 0.5f);
         }
         hud.end();
     }
@@ -372,6 +395,8 @@ public class DrivingScene implements Scene {
         lapTime = 0f;
         passedHalf = false;
         crashFlash = 1.4f;
+        countdown = COUNTDOWN_START;   // re-count 3..2..1 before the clock restarts
+        goFlash = 0f;
         camYaw = 0f;
         // Snap the camera behind the start so it doesn't swoop across the map.
         float a = startHeading + (float) Math.PI;
