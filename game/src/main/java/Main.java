@@ -1,5 +1,6 @@
 import engine.Application;
 import scenes.CameraCubeScene;
+import scenes.EcsScene;
 import scenes.LightsScene;
 import scenes.LitCubeScene;
 import scenes.MaterialScene;
@@ -29,6 +30,7 @@ public class Main {
                 .scene(new ModelScene())           // 7
                 .scene(new ShadowScene())          // 8
                 .scene(new TerrainScene())         // 9
+                .scene(new EcsScene())             // 0 (10th)
                 .run();
     }
 }

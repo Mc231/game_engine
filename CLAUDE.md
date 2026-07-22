@@ -71,6 +71,10 @@ The loop is **fixed-timestep**: `fixedUpdate` runs at a constant 60 Hz (accumula
 
 **Ownership rule:** `GameObject` and `Material` do **not** own (or dispose) their shared `Mesh`/`Texture`/`ShaderProgram` — the owning `Scene` disposes those in its `dispose()`. Anything holding GPU resources implements `engine.Disposable`. Only the active scene is disposed on shutdown (others were never initialized).
 
+### Entity-component + resources (higher-level structure)
+
+Beyond the direct `GameObject`+`Mesh` approach, the engine has a small ECS: `Entity` (a `Transform` + a list of components + parent/children), `Component` (lifecycle `update(dt)`; subclass it for "scripts"), and `World` (holds entities, `update(dt)` recurses, `collect(Type)` gathers components). Built-in components: `MeshRenderer` (mesh + material) and `LightComponent` (copies its entity's world position into the light). `Entity.worldMatrix()` composes parent × local for scene graphs. `EcsScene` is the reference usage — a scene still owns the render loop (it `collect`s renderers/lights and draws them). `ResourceManager` caches textures/shaders/meshes by key (loads once) and disposes them all in its own `dispose()` — a scene that uses it disposes the manager instead of the individual assets.
+
 ### Uniform-name conventions (contract between engine and shaders)
 
 Engine classes set uniforms by fixed names that shaders must declare:

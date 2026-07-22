@@ -39,6 +39,11 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 - **Procedural terrain** (`Terrain` + `Noise`) — Perlin/fBm heightmap, computed normals, elevation coloring, distance fog.
 - Shaders/textures/models loaded from `src/main/resources` via the classpath.
 
+**Content structure**
+- **Mini-ECS**: `Entity` + `Component` + `World`, with `MeshRenderer`, `LightComponent`, and script components (override `Component.update`).
+- **Scene graph / parenting**: `Entity` parent/children; `worldMatrix()` composes parent × local for multi-level hierarchies.
+- **`ResourceManager`**: caches textures/shaders/meshes by key (loads once), owns and disposes them centrally.
+
 ### 🎬 Demo scenes (`scenes/`, switch with number keys)
 1. `TriangleScene` — first triangle
 2. `TexturedCubeScene` — textured cube
@@ -76,6 +81,9 @@ _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 | `OBJLoader` | .obj → `Mesh` |
 | `Terrain`, `Noise` | Procedural heightmap terrain |
 | `Geometry` | Static mesh data (cube, plane) |
+| `Entity`, `Component`, `World` | Mini-ECS: entities, components, and their container |
+| `MeshRenderer`, `LightComponent` | Built-in components (draw a mesh / carry a light) |
+| `ResourceManager` | Cache-by-key asset loading + central disposal |
 | `Disposable` | GPU-resource cleanup contract |
 
 ---
@@ -91,11 +99,11 @@ Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 - ✅ **Time & frame stats** — `Time` (delta, elapsed, frameCount, smoothed fps); FPS shown in the window title.
 - ✅ **Logging + GL debug** — `Log` (leveled) + `GLDebug` (debug-output callback where supported, `checkError` fallback for macOS's 4.1 context).
 
-### B. Content & scene structure
-- **★★ Entity/Component model (mini-ECS)** — components (Transform, MeshRenderer, Light, Script) on entities; a `World` that updates/renders them. This is the backbone of a real engine.
-- **★★ Scene graph / parenting** — child transforms relative to parents (turrets on tanks, moons on planets).
-- **★★ `Model` (multi-mesh) + material assignment** — OBJ files with groups/materials (.mtl), not just one mesh.
-- **★★ Resource/asset manager** — cache and share textures/shaders/models by path; dispose centrally.
+### B. Content & scene structure (mostly ✅ DONE)
+- ✅ **Entity/Component model (mini-ECS)** — `Component`/`Entity`/`World`; `MeshRenderer`, `LightComponent`, and script components (override `update`). Demoed by `EcsScene`.
+- ✅ **Scene graph / parenting** — `Entity` parent/children; `worldMatrix()` composes parent × local (multi-level hierarchies: hub → cube → moon).
+- **★★ `Model` (multi-mesh) + material assignment** — OBJ files with groups/materials (.mtl), not just one mesh. *(still to do)*
+- ✅ **Resource/asset manager** — `ResourceManager` caches textures/shaders/meshes by key, loads once, disposes all centrally.
 
 ### C. Rendering upgrades
 - **★★ Skybox / cubemap** — a real sky instead of flat fog color.
@@ -126,8 +134,8 @@ Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 A pragmatic order to reach "can build a small game":
 
 1. ~~**Foundation:** fixed-timestep loop + resize handling + FPS/time (A).~~ ✅ **DONE**
-2. **Structure:** mini-ECS + resource manager (B). Turns "hardcoded scenes" into "data-driven worlds." ← next
-3. **Playable world:** terrain collision + input actions + a character controller (D). First real "game feel."
+2. ~~**Structure:** mini-ECS + resource manager (B).~~ ✅ **DONE** (multi-mesh `Model`/.mtl still open)
+3. **Playable world:** terrain collision + input actions + a character controller (D). First real "game feel." ← next
 4. **Polish the look:** skybox + text/HUD + audio (C/D). Now it looks and sounds like a game.
 5. **Pipeline:** scene serialization + settings (E). Author levels without recompiling.
 
