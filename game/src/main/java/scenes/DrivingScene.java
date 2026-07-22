@@ -19,6 +19,7 @@ import engine.Scene;
 import engine.ShaderProgram;
 import engine.Skybox;
 import engine.Terrain;
+import engine.Texture;
 import engine.Window;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -64,6 +65,7 @@ public class DrivingScene implements Scene {
     private static final float RX = 150f;               // track ellipse radii
     private static final float RZ = 110f;
     private static final float ROAD_WIDTH = 10f;
+    private static final float FOG_DENSITY = 0.0016f;   // atmospheric depth
 
     // Instanced forest shader (baked vertex colors + one directional light).
     private static final String TREE_VERTEX = """
@@ -74,24 +76,34 @@ public class DrivingScene implements Scene {
             layout (location = 3) in mat4 aInstance;
             out vec3 vColor;
             out vec3 vNormal;
+            out vec3 vWorld;
             uniform mat4 uView;
             uniform mat4 uProjection;
             void main() {
+                vec4 world = aInstance * vec4(aPos, 1.0);
+                vWorld = world.xyz;
                 vNormal = mat3(aInstance) * aNormal;
                 vColor = aColor;
-                gl_Position = uProjection * uView * aInstance * vec4(aPos, 1.0);
+                gl_Position = uProjection * uView * world;
             }
             """;
     private static final String TREE_FRAGMENT = """
             #version 330 core
             in vec3 vColor;
             in vec3 vNormal;
+            in vec3 vWorld;
             out vec4 FragColor;
             uniform vec3 uLightDir;
+            uniform vec3 uViewPos;
+            uniform vec3 uFogColor;
+            uniform float uFogDensity;
             void main() {
                 vec3 N = normalize(vNormal);
                 float diff = max(dot(N, normalize(-uLightDir)), 0.0);
-                FragColor = vec4(vColor * (0.45 + 0.65 * diff), 1.0);
+                vec3 color = vColor * (0.45 + 0.65 * diff);
+                float dist = length(uViewPos - vWorld);
+                float fog = 1.0 - exp(-dist * uFogDensity);
+                FragColor = vec4(mix(color, uFogColor, clamp(fog, 0.0, 1.0)), 1.0);
             }
             """;
 
@@ -100,6 +112,8 @@ public class DrivingScene implements Scene {
     private ShaderProgram litShader;
     private ShaderProgram treeShader;
     private Terrain terrain;
+    private Texture grassTex;
+    private Texture rockTex;
     private Mesh roadMesh;
     private Material roadMaterial;
     private Model car;
@@ -121,7 +135,7 @@ public class DrivingScene implements Scene {
     private final Vector3f desiredCam = new Vector3f();
     private final Vector3f up = new Vector3f(0f, 1f, 0f);
     private final Vector3f lightDir = new Vector3f(-0.4f, -1f, -0.3f).normalize();
-    private final Vector3f sky = new Vector3f(0.62f, 0.74f, 0.88f);
+    private final Vector3f sky = new Vector3f(0.72f, 0.80f, 0.90f);   // matches skybox horizon
     private float camYaw = 0f;
     private float camPitch = 0.42f;
 
@@ -142,9 +156,11 @@ public class DrivingScene implements Scene {
     @Override
     public void init(Window window) {
         this.window = window;
-        terrainShader = ShaderProgram.fromFiles("shaders/terrain.vert", "shaders/terrain.frag");
+        terrainShader = ShaderProgram.fromFiles("shaders/terrain.vert", "shaders/terrain_tex.frag");
         litShader = resources.shader("shaders/lit.vert", "shaders/lit.frag");
         treeShader = new ShaderProgram(TREE_VERTEX, TREE_FRAGMENT);
+        grassTex = resources.texture("textures/grass.jpg");
+        rockTex = resources.texture("textures/rock.jpg");
 
         terrain = new Terrain(320, 700f, 12f, 2025L);   // large, gentle green hills
 
@@ -296,6 +312,10 @@ public class DrivingScene implements Scene {
         terrainShader.setUniform("uLightDir", lightDir);
         terrainShader.setUniform("uMaxHeight", terrain.maxHeight);
         terrainShader.setUniform("uFogColor", sky);
+        grassTex.bind(0);
+        terrainShader.setUniform("uGrass", 0);
+        rockTex.bind(1);
+        terrainShader.setUniform("uRock", 1);
         terrain.mesh().render();
 
         // Road + car (lit shader, one directional light).
@@ -305,6 +325,8 @@ public class DrivingScene implements Scene {
         litShader.setUniform("uViewPos", camPos);
         litShader.setUniform("uLightCount", 1);
         engine.Light.directional(lightDir, new Vector3f(1f, 1f, 1f)).apply(litShader, "uLights[0]");
+        litShader.setUniform("uFogColor", sky);
+        litShader.setUniform("uFogDensity", FOG_DENSITY);
         roadMaterial.use();
         litShader.setUniform("uModel", IDENTITY);
         roadMesh.render();
@@ -316,6 +338,9 @@ public class DrivingScene implements Scene {
         treeShader.setUniform("uProjection", projection);
         treeShader.setUniform("uView", view);
         treeShader.setUniform("uLightDir", lightDir);
+        treeShader.setUniform("uViewPos", camPos);
+        treeShader.setUniform("uFogColor", sky);
+        treeShader.setUniform("uFogDensity", FOG_DENSITY);
         forest.render();
 
         // Sky fills the background.

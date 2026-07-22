@@ -1,0 +1,4 @@
+Terrain/road textures from ambientCG (https://ambientcg.com) — License: CC0 1.0 (public domain).
+- grass.jpg : "Grass001"   (Color map, downscaled)
+- rock.jpg  : "Rock030"    (Color map, downscaled)
+- road.png  : "Asphalt014" (Color map, downscaled + lane markings added)

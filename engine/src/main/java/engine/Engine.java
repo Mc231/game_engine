@@ -10,6 +10,7 @@ import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_BRACKET;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_BRACKET;
 import static org.lwjgl.glfw.GLFW.glfwGetTime;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 
 /**
  * Owns the {@link Window} and runs the main loop over one or more {@link Scene}s.
@@ -58,6 +59,7 @@ public class Engine {
             GL.createCapabilities();
             GLDebug.enable();               // OpenGL debug output where supported
             glEnable(GL_DEPTH_TEST);
+            glEnable(GL_MULTISAMPLE);       // MSAA (no-op if the context isn't multisampled)
             activate(0, true);
             loop();
         } finally {

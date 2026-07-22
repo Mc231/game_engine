@@ -90,6 +90,8 @@ Beyond the direct `GameObject`+`Mesh` approach, the engine has a small ECS: `Ent
 - **`PostProcessor`** — a full-screen pass that samples a `Framebuffer` and applies an effect (`NONE`/`GRAYSCALE`/`INVERT`/`VIGNETTE`); the base for bloom/FXAA later.
 - **`InstancedMesh`** — one mesh drawn many times via `glDrawElementsInstanced` with a per-instance `mat4` attribute at locations `base..base+3` (base = the count of the mesh's own attributes, e.g. 3 for `{3,3,2}`); the shader declares `layout(location=3) in mat4 aInstance`.
 - `SkyboxScene` combines all three (instanced field under a sky, rendered through a post effect).
+- **MSAA** — `WindowConfig.samples` (default 4) requests a multisampled window (`GLFW_SAMPLES`); `Engine` enables `GL_MULTISAMPLE`. This smooths edges on the default framebuffer (note: it does NOT apply to the offscreen `Framebuffer` used by `PostProcessor`).
+- **Distance fog** — `lit.frag` has optional exponential fog via `uFogColor` + `uFogDensity` (density 0 = off, so scenes that don't set it are unaffected). `DrivingScene` uses it (plus fog in its tree shader and the terrain shader) so the world fades into the skybox horizon.
 
 ### Tooling / pipeline
 

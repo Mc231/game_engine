@@ -21,6 +21,7 @@ public final class WindowConfig {
     public final boolean vsync;
     public final int glMajor;
     public final int glMinor;
+    public final int samples;   // MSAA sample count (0 = off)
     public final float clearR, clearG, clearB, clearA;
 
     private WindowConfig(Builder b) {
@@ -31,6 +32,7 @@ public final class WindowConfig {
         this.vsync = b.vsync;
         this.glMajor = b.glMajor;
         this.glMinor = b.glMinor;
+        this.samples = b.samples;
         this.clearR = b.clearR;
         this.clearG = b.clearG;
         this.clearB = b.clearB;
@@ -50,6 +52,7 @@ public final class WindowConfig {
         private boolean vsync = true;
         private int glMajor = 3;
         private int glMinor = 3;
+        private int samples = 4;   // 4x MSAA by default (smooths jagged edges)
         private float clearR = 0.1f, clearG = 0.12f, clearB = 0.15f, clearA = 1f;
 
         public Builder size(int width, int height) {
@@ -77,6 +80,12 @@ public final class WindowConfig {
         public Builder glVersion(int major, int minor) {
             this.glMajor = major;
             this.glMinor = minor;
+            return this;
+        }
+
+        /** MSAA samples (0/1 = off, typically 2/4/8). */
+        public Builder samples(int samples) {
+            this.samples = samples;
             return this;
         }
 

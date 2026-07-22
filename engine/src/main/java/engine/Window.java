@@ -30,6 +30,9 @@ public class Window implements Disposable {
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, config.resizable ? GLFW_TRUE : GLFW_FALSE);
+        if (config.samples > 1) {
+            glfwWindowHint(GLFW_SAMPLES, config.samples);   // MSAA
+        }
 
         // Core profile + forward-compat: required for modern shaders on macOS.
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, config.glMajor);

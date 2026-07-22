@@ -26,6 +26,10 @@ uniform float uAmbientStrength;
 uniform float uSpecularStrength;
 uniform float uShininess;
 
+// Distance fog (uFogDensity 0 = disabled, so scenes that don't set it are unaffected).
+uniform vec3 uFogColor;
+uniform float uFogDensity;
+
 vec3 calcLight(Light light, vec3 N, vec3 viewDir) {
     vec3 lightDir;
     float attenuation = 1.0;
@@ -64,5 +68,13 @@ void main() {
     for (int i = 0; i < uLightCount; i++) {
         lighting += calcLight(uLights[i], N, viewDir);
     }
-    FragColor = vec4(lighting * baseColor, 1.0);
+    vec3 color = lighting * baseColor;
+
+    // Exponential distance fog toward uFogColor.
+    if (uFogDensity > 0.0) {
+        float dist = length(uViewPos - fragPos);
+        float fog = 1.0 - exp(-dist * uFogDensity);
+        color = mix(color, uFogColor, clamp(fog, 0.0, 1.0));
+    }
+    FragColor = vec4(color, 1.0);
 }
