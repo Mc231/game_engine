@@ -16,6 +16,7 @@ import scenes.TerrainScene;
 import scenes.TexturedCubeScene;
 import scenes.TriangleScene;
 import scenes.WalkScene;
+import scenes.prison.PrisonScene;
 
 /**
  * Entry point. Loads {@link Settings} from a file, then defines the whole game
@@ -47,6 +48,7 @@ public class Main {
                 .scene(new NormalMapScene())       // 14th ([ / ] to reach)
                 .scene(new PhysicsScene())         // 15th ([ / ] to reach)
                 .scene(new DrivingScene())         // 16th ([ / ] to reach) — the driving game
+                .scene(new PrisonScene())          // 17th ([ / ] to reach) — Prison Break (stealth)
                 .run();
     }
 }
