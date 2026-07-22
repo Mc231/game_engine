@@ -74,7 +74,7 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 `[`/`]` → `SerializedScene` — a level loaded from `levels/demo.json`
 `[`/`]` → `NormalMapScene` — normal mapping + transparency + shader hot-reload (`R`)
 `[`/`]` → `PhysicsScene` — raycast/AABB picking (crosshair highlights a cube)
-`[`/`]` → **`DrivingScene`** — drive a CC0 car around a road loop on rolling terrain 🏎️
+`[`/`]` → **`DrivingScene`** — drive a CC0 car around a curvy spline road on rolling terrain, under a cubemap sky, past an instanced forest 🏎️🌲
 
 _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 
@@ -119,7 +119,8 @@ _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 | `Gamepad` | GLFW gamepad polling (buttons/axes/edges) |
 | `ShaderReloader` | Live shader reload from source files |
 | `CarController` | Arcade car driving (throttle/steer/brake, ground-clamp) |
-| `Road` | Terrain-conforming closed-loop road ribbon mesh |
+| `Road` | Terrain-conforming road ribbon — `loop` (oval) or `spline` (curvy) |
+| `Scatter` | Random instance transforms over terrain (with an exclude region) |
 | `Disposable` | GPU-resource cleanup contract |
 
 ---
