@@ -35,7 +35,7 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 - **Directional shadow mapping** — depth FBO (`ShadowMap`), PCF soft edges, slope-scaled bias.
 
 **World / assets**
-- **OBJ model loader** (`OBJLoader`) — positions/uvs/normals, fan-triangulation, indexed output.
+- **OBJ model loader** (`OBJLoader`) — positions/uvs/normals, fan-triangulation, indexed output; `parseModel` splits by `usemtl`. **Multi-material `Model`** (`Model` + `MtlLoader`) — one mesh+material per group, .mtl colors/textures.
 - **Procedural terrain** (`Terrain` + `Noise`) — Perlin/fBm heightmap, computed normals, elevation coloring, distance fog.
 - Shaders/textures/models loaded from `src/main/resources` via the classpath.
 
@@ -80,6 +80,7 @@ _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 | `ShadowMap` | Depth-only framebuffer for shadows |
 | `OBJLoader` | .obj → `Mesh` |
 | `Terrain`, `Noise` | Procedural heightmap terrain |
+| `OBJLoader`, `MtlLoader`, `Model` | OBJ/MTL parsing + multi-material model |
 | `Geometry` | Static mesh data (cube, plane) |
 | `Entity`, `Component`, `World` | Mini-ECS: entities, components, and their container |
 | `MeshRenderer`, `LightComponent` | Built-in components (draw a mesh / carry a light) |
@@ -99,10 +100,10 @@ Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 - ✅ **Time & frame stats** — `Time` (delta, elapsed, frameCount, smoothed fps); FPS shown in the window title.
 - ✅ **Logging + GL debug** — `Log` (leveled) + `GLDebug` (debug-output callback where supported, `checkError` fallback for macOS's 4.1 context).
 
-### B. Content & scene structure (mostly ✅ DONE)
+### B. Content & scene structure ✅ DONE
 - ✅ **Entity/Component model (mini-ECS)** — `Component`/`Entity`/`World`; `MeshRenderer`, `LightComponent`, and script components (override `update`). Demoed by `EcsScene`.
 - ✅ **Scene graph / parenting** — `Entity` parent/children; `worldMatrix()` composes parent × local (multi-level hierarchies: hub → cube → moon).
-- **★★ `Model` (multi-mesh) + material assignment** — OBJ files with groups/materials (.mtl), not just one mesh. *(still to do)*
+- ✅ **`Model` (multi-mesh) + material assignment** — `Model.load` splits an OBJ by `usemtl` into one mesh+material per group; `OBJLoader.parseModel` + `MtlLoader` read the .mtl (Kd/Ns/map_Kd). Demoed by `ModelScene` (3 colored cubes from one file).
 - ✅ **Resource/asset manager** — `ResourceManager` caches textures/shaders/meshes by key, loads once, disposes all centrally.
 
 ### C. Rendering upgrades
@@ -134,7 +135,7 @@ Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 A pragmatic order to reach "can build a small game":
 
 1. ~~**Foundation:** fixed-timestep loop + resize handling + FPS/time (A).~~ ✅ **DONE**
-2. ~~**Structure:** mini-ECS + resource manager (B).~~ ✅ **DONE** (multi-mesh `Model`/.mtl still open)
+2. ~~**Structure:** mini-ECS + resource manager + multi-material models (B).~~ ✅ **DONE**
 3. **Playable world:** terrain collision + input actions + a character controller (D). First real "game feel." ← next
 4. **Polish the look:** skybox + text/HUD + audio (C/D). Now it looks and sounds like a game.
 5. **Pipeline:** scene serialization + settings (E). Author levels without recompiling.
