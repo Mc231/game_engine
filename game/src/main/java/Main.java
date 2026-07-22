@@ -6,6 +6,8 @@ import scenes.LightsScene;
 import scenes.LitCubeScene;
 import scenes.MaterialScene;
 import scenes.ModelScene;
+import scenes.NormalMapScene;
+import scenes.PhysicsScene;
 import scenes.SerializedScene;
 import scenes.ShadowScene;
 import scenes.SkyboxScene;
@@ -41,6 +43,8 @@ public class Main {
                 .scene(new WalkScene())            // 11th ([ / ] to reach)
                 .scene(new SkyboxScene())          // 12th ([ / ] to reach)
                 .scene(new SerializedScene())      // 13th ([ / ] to reach)
+                .scene(new NormalMapScene())       // 14th ([ / ] to reach)
+                .scene(new PhysicsScene())         // 15th ([ / ] to reach)
                 .run();
     }
 }

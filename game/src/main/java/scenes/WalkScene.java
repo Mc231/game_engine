@@ -2,6 +2,7 @@ package scenes;
 
 import engine.Audio;
 import engine.CharacterController;
+import engine.Gamepad;
 import engine.Hud;
 import engine.Input;
 import engine.InputMap;
@@ -13,6 +14,11 @@ import engine.Window;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_AXIS_LEFT_X;
+import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_AXIS_LEFT_Y;
+import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_AXIS_RIGHT_X;
+import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_AXIS_RIGHT_Y;
+import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_BUTTON_A;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_A;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_D;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_S;
@@ -37,6 +43,7 @@ public class WalkScene implements Scene {
     private CharacterController player;
     private Input input;
     private InputMap actions;
+    private Gamepad gamepad;
     private Hud hud;
     private Audio audio;
     private Sound jumpSound;
@@ -60,7 +67,9 @@ public class WalkScene implements Scene {
                 .bind("back", GLFW_KEY_S)
                 .bind("left", GLFW_KEY_A)
                 .bind("right", GLFW_KEY_D)
-                .bind("jump", GLFW_KEY_SPACE);
+                .bind("jump", GLFW_KEY_SPACE)
+                .bindPad("jump", GLFW_GAMEPAD_BUTTON_A);
+        gamepad = new Gamepad();
 
         input = window.input();
         input.setMouseCaptured(true);
@@ -75,13 +84,21 @@ public class WalkScene implements Scene {
 
     @Override
     public void update(float deltaSeconds) {
-        player.addLook(input.mouseDeltaX(), input.mouseDeltaY());
+        gamepad.update();
 
-        float forward = (actions.isDown("forward", input) ? 1f : 0f)
-                - (actions.isDown("back", input) ? 1f : 0f);
-        float strafe = (actions.isDown("right", input) ? 1f : 0f)
-                - (actions.isDown("left", input) ? 1f : 0f);
-        boolean jump = actions.isPressed("jump", input);
+        // Look: mouse + right analog stick.
+        player.addLook(
+                input.mouseDeltaX() + gamepad.axis(GLFW_GAMEPAD_AXIS_RIGHT_X) * 20f,
+                input.mouseDeltaY() - gamepad.axis(GLFW_GAMEPAD_AXIS_RIGHT_Y) * 20f);
+
+        // Move: keyboard actions + left analog stick (deadzoned).
+        float forward = (actions.isDown("forward", input, gamepad) ? 1f : 0f)
+                - (actions.isDown("back", input, gamepad) ? 1f : 0f)
+                - deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_LEFT_Y));
+        float strafe = (actions.isDown("right", input, gamepad) ? 1f : 0f)
+                - (actions.isDown("left", input, gamepad) ? 1f : 0f)
+                + deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_LEFT_X));
+        boolean jump = actions.isPressed("jump", input, gamepad);
 
         boolean wasGrounded = player.onGround();
         player.update(deltaSeconds, forward, strafe, jump, terrain::heightAt);
@@ -89,6 +106,11 @@ public class WalkScene implements Scene {
         if (jump && wasGrounded) {
             jumpSound.play();
         }
+    }
+
+    /** Ignore small analog-stick noise around center. */
+    private static float deadzone(float v) {
+        return Math.abs(v) < 0.2f ? 0f : v;
     }
 
     @Override

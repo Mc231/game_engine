@@ -53,4 +53,34 @@ public final class Geometry {
                 -0.5f,-0.5f,-0.5f,  0f,-1f,0f, 0f,1f,   0.5f,-0.5f, 0.5f,  0f,-1f,0f, 1f,0f,  -0.5f,-0.5f, 0.5f,  0f,-1f,0f, 0f,0f,
         };
     }
+
+    /**
+     * A unit cube (−0.5..0.5) as 36 vertices, each: position(3) + normal(3) +
+     * uv(2) + tangent(3). Use with a {@code new int[]{3, 3, 2, 3}} attribute
+     * layout. Matches the face layout and uvs of {@link #cubeWithNormalsAndUV()},
+     * adding a per-face tangent (world-space direction of increasing U) after the
+     * uv so the two are consistent. Tangents are approximate unit vectors.
+     */
+    public static float[] cubeWithTangents() {
+        return new float[]{
+                // front  (normal 0,0,1)   tangent 1,0,0
+                -0.5f,-0.5f, 0.5f,  0f,0f,1f,  0f,0f,  1f,0f,0f,   0.5f,-0.5f, 0.5f,  0f,0f,1f,  1f,0f,  1f,0f,0f,   0.5f, 0.5f, 0.5f,  0f,0f,1f,  1f,1f,  1f,0f,0f,
+                -0.5f,-0.5f, 0.5f,  0f,0f,1f,  0f,0f,  1f,0f,0f,   0.5f, 0.5f, 0.5f,  0f,0f,1f,  1f,1f,  1f,0f,0f,  -0.5f, 0.5f, 0.5f,  0f,0f,1f,  0f,1f,  1f,0f,0f,
+                // back   (normal 0,0,-1)  tangent -1,0,0
+                -0.5f,-0.5f,-0.5f,  0f,0f,-1f, 0f,0f, -1f,0f,0f,  -0.5f, 0.5f,-0.5f,  0f,0f,-1f, 0f,1f, -1f,0f,0f,   0.5f, 0.5f,-0.5f,  0f,0f,-1f, 1f,1f, -1f,0f,0f,
+                -0.5f,-0.5f,-0.5f,  0f,0f,-1f, 0f,0f, -1f,0f,0f,   0.5f, 0.5f,-0.5f,  0f,0f,-1f, 1f,1f, -1f,0f,0f,   0.5f,-0.5f,-0.5f,  0f,0f,-1f, 1f,0f, -1f,0f,0f,
+                // left   (normal -1,0,0)  tangent 0,0,1
+                -0.5f, 0.5f, 0.5f, -1f,0f,0f,  1f,1f,  0f,0f,1f,  -0.5f, 0.5f,-0.5f, -1f,0f,0f,  0f,1f,  0f,0f,1f,  -0.5f,-0.5f,-0.5f, -1f,0f,0f,  0f,0f,  0f,0f,1f,
+                -0.5f, 0.5f, 0.5f, -1f,0f,0f,  1f,1f,  0f,0f,1f,  -0.5f,-0.5f,-0.5f, -1f,0f,0f,  0f,0f,  0f,0f,1f,  -0.5f,-0.5f, 0.5f, -1f,0f,0f,  1f,0f,  0f,0f,1f,
+                // right  (normal 1,0,0)   tangent 0,0,-1
+                 0.5f, 0.5f, 0.5f,  1f,0f,0f,  1f,1f,  0f,0f,-1f,  0.5f,-0.5f,-0.5f,  1f,0f,0f,  0f,0f,  0f,0f,-1f,  0.5f, 0.5f,-0.5f,  1f,0f,0f,  0f,1f,  0f,0f,-1f,
+                 0.5f, 0.5f, 0.5f,  1f,0f,0f,  1f,1f,  0f,0f,-1f,  0.5f,-0.5f, 0.5f,  1f,0f,0f,  1f,0f,  0f,0f,-1f,  0.5f,-0.5f,-0.5f,  1f,0f,0f,  0f,0f,  0f,0f,-1f,
+                // top    (normal 0,1,0)   tangent 1,0,0
+                -0.5f, 0.5f,-0.5f,  0f,1f,0f,  0f,1f,  1f,0f,0f,  -0.5f, 0.5f, 0.5f,  0f,1f,0f,  0f,0f,  1f,0f,0f,   0.5f, 0.5f, 0.5f,  0f,1f,0f,  1f,0f,  1f,0f,0f,
+                -0.5f, 0.5f,-0.5f,  0f,1f,0f,  0f,1f,  1f,0f,0f,   0.5f, 0.5f, 0.5f,  0f,1f,0f,  1f,0f,  1f,0f,0f,   0.5f, 0.5f,-0.5f,  0f,1f,0f,  1f,1f,  1f,0f,0f,
+                // bottom (normal 0,-1,0)  tangent 1,0,0
+                -0.5f,-0.5f,-0.5f,  0f,-1f,0f, 0f,1f,  1f,0f,0f,   0.5f,-0.5f,-0.5f,  0f,-1f,0f, 1f,1f,  1f,0f,0f,   0.5f,-0.5f, 0.5f,  0f,-1f,0f, 1f,0f,  1f,0f,0f,
+                -0.5f,-0.5f,-0.5f,  0f,-1f,0f, 0f,1f,  1f,0f,0f,   0.5f,-0.5f, 0.5f,  0f,-1f,0f, 1f,0f,  1f,0f,0f,  -0.5f,-0.5f, 0.5f,  0f,-1f,0f, 0f,0f,  1f,0f,0f,
+        };
+    }
 }

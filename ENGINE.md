@@ -29,6 +29,7 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 - `Transform` (pos/rot/scale) + `GameObject` (mesh + material + transform).
 - `Camera` — first-person fly camera.
 - **Skybox** (`Skybox` + `CubemapTexture`), **post-processing** (`Framebuffer` + `PostProcessor`), **instanced rendering** (`InstancedMesh`), **HUD text** (`Hud`).
+- **Normal mapping** (tangent geometry + `normalmap` shader), **transparency** (sorted alpha blending), **shader hot-reload** (`ShaderReloader`).
 
 **Lighting**
 - Phong shading (ambient + diffuse + specular).
@@ -46,8 +47,9 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 - **`ResourceManager`**: caches textures/shaders/meshes by key (loads once), owns and disposes them centrally.
 
 **Gameplay**
-- **Input actions** (`InputMap`): named actions → keys, `isDown`/`isPressed`.
+- **Input actions** (`InputMap`): named actions → keys **and gamepad buttons** (`Gamepad`).
 - **Character controller** (`CharacterController`): first-person walk, gravity, jump, ground-clamp to a height field.
+- **Collision math** (`AABB`, `Ray`, `Intersect`): raycasting + AABB overlap for picking/queries.
 - **Audio** (`Audio` + `Sound`): OpenAL playback of WAV sound effects.
 - **HUD** (`Hud`): 2D text overlay via stb_easy_font (core-profile triangles).
 - Runtime scene cycling with `[` / `]` (beyond the 10 number keys).
@@ -70,6 +72,8 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 `[`/`]` → `WalkScene` — **walk the terrain** (gravity/jump, HUD, jump SFX)
 `[`/`]` → `SkyboxScene` — skybox + instanced field + post-FX (`E` to cycle)
 `[`/`]` → `SerializedScene` — a level loaded from `levels/demo.json`
+`[`/`]` → `NormalMapScene` — normal mapping + transparency + shader hot-reload (`R`)
+`[`/`]` → `PhysicsScene` — raycast/AABB picking (crosshair highlights a cube)
 
 _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 
@@ -110,6 +114,9 @@ _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 | `InstancedMesh` | One mesh drawn many times (per-instance matrix) |
 | `SceneData`, `SceneSerializer`, `SceneBuilder` | JSON level model, (de)serializer, and JSON → `World` builder |
 | `Settings` | User settings from a `.properties` file |
+| `AABB`, `Ray`, `Intersect` | Bounding boxes, rays, and intersection tests |
+| `Gamepad` | GLFW gamepad polling (buttons/axes/edges) |
+| `ShaderReloader` | Live shader reload from source files |
 | `Disposable` | GPU-resource cleanup contract |
 
 ---
@@ -136,22 +143,22 @@ Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 - ✅ **Framebuffer / post-processing** — `Framebuffer` (render-to-texture) + `PostProcessor` (grayscale/invert/vignette; the base for bloom/FXAA later).
 - ✅ **Instanced rendering** — `InstancedMesh` draws many objects in one call (per-instance mat4 attribute).
 - ✅ **Text rendering** — `Hud` via stb_easy_font (delivered in D).
-- **★★ Normal mapping** — surface detail from a texture (needs tangents in the vertex format). *(to do)*
-- **★★ Transparency & blend ordering** — glass, foliage, particles. *(to do)*
+- ✅ **Normal mapping** — `Geometry.cubeWithTangents` (pos+normal+uv+tangent) + `shaders/normalmap.*` (TBN, tangent-space normals). `NormalMapScene`.
+- ✅ **Transparency & blend ordering** — alpha blending with depth-write off and back-to-front sorting (translucent panes in `NormalMapScene`).
 - **★★★ Advanced shadows** — point/spot cube-map shadows, cascaded shadow maps. *(to do; directional shadows exist)*
 
 ### D. Gameplay systems (mostly ✅ DONE)
-- ✅ **Input mapping / actions** — `InputMap` binds named actions to keys (`isDown`/`isPressed`). *(gamepad not yet)*
+- ✅ **Input mapping / actions** — `InputMap` binds named actions to keys **and gamepad buttons** (`Gamepad`); `WalkScene` supports keyboard + controller.
 - ✅ **Terrain collision & walking** — `CharacterController` (gravity, jump, ground-clamp to a height field); `WalkScene` walks the terrain via `Terrain.heightAt`.
-- **★★★ Physics & collision** — general AABB/sphere broadphase + raycasting. *(still to do — only terrain ground collision exists)*
+- ✅ **Collision math / raycasting** — `AABB`, `Ray`, `Intersect` (ray-AABB, AABB-AABB, ray-plane); `PhysicsScene` picks cubes by raycast. *(full physics/broadphase still to do)*
 - ✅ **Audio** — `Audio` (OpenAL device/context) + `Sound` (WAV → buffer/source); `WalkScene` plays a jump SFX.
 - ✅ **UI/HUD layer** — `Hud` 2D text overlay (stb_easy_font). *(no widgets/buttons yet)*
 
 ### E. Tooling & pipeline (partly ✅ DONE)
 - ✅ **Scene serialization** — `SceneData`/`EntityData`/`ComponentData` + `SceneSerializer` (Gson JSON) + `SceneBuilder` (JSON → live `World`). `SerializedScene` loads `levels/demo.json`.
 - ✅ **Config/settings** — `Settings` loads resolution/vsync/sensitivity/volume from `settings.properties`; `Main` applies it.
+- ✅ **Hot-reload** — `ShaderReloader` rebuilds a shader when its source files change (keeps the old program if the new one fails to compile). `NormalMapScene` uses it (`R` to force).
 - **★★★ In-engine editor overlay** — inspect/tweak transforms, lights, materials at runtime (ImGui-style). *(to do)*
-- **★★★ Hot-reload** — reload shaders/textures on file change while running. *(to do)*
 
 ---
 

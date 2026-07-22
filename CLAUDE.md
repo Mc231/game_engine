@@ -96,6 +96,13 @@ Beyond the direct `GameObject`+`Mesh` approach, the engine has a small ECS: `Ent
 - **Scene serialization** — levels are authored as JSON, not Java. `SceneData`/`EntityData`/`ComponentData` are the (flat, Gson-friendly) data model; `SceneSerializer` does JSON ↔ `SceneData` (+ `loadFromResource`/`saveToFile`); `SceneBuilder.build(sceneData, litShader, resources)` instantiates a live ECS `World`, pulling meshes/textures through the `ResourceManager` (so the scene disposes the manager, not individual assets). `SerializedScene` loads `game/src/main/resources/levels/demo.json`. Component descriptors are discriminated by a `type` string (`"mesh"` / `"light"`) with nullable fields — no Gson polymorphic adapters needed.
 - **Settings** — `Settings.load("settings.properties")` reads resolution/vsync/mouse-sensitivity/volume (defaults for missing/malformed keys, never throws); `Main` applies width/height/vsync to the `Application`. `Settings.fromProperties(Properties)` is the unit-tested pure seam.
 - The JSON library is **Gson** (`implementation` dep in `:engine` — internal, not exposed to `:game`).
+- **Hot-reload** — `ShaderReloader(vertPath, fragPath)` loads a shader from **filesystem source files** (not the classpath) and `reloadIfChanged()`/`reload()` rebuilds it live, keeping the old program if the new one fails to compile. The Gradle `run` task's working dir is the `game/` module dir, so source paths are relative to that (`NormalMapScene.resolveShaderPath` tries both `game/` and repo-root bases).
+
+### Gameplay math & input
+
+- **`InputMap`** also binds **gamepad** buttons (`bindPad`); `isDown`/`isPressed` have `(action, Input, Gamepad)` overloads. **`Gamepad`** polls GLFW gamepad state (call `update()` each frame). `WalkScene` reads keyboard + controller.
+- **`AABB` / `Ray` / `Intersect`** — pure collision math (ray-AABB slab test, AABB overlap, ray-plane); `PhysicsScene` raycasts from the camera to pick cubes.
+- **Normal mapping** — `Geometry.cubeWithTangents()` (layout `{3,3,2,3}`) + `shaders/normalmap.*` (TBN, tangent-space normals). **Transparency** — alpha blend with `glDepthMask(false)` and back-to-front sorting (see `NormalMapScene`).
 
 ### Uniform-name conventions (contract between engine and shaders)
 
