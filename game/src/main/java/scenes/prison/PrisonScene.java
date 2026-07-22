@@ -87,7 +87,7 @@ public class PrisonScene implements Scene {
     private Mesh floorMesh;
     private Mesh coneMesh;
     private InstancedMesh bars;
-    private Material guardMat, visorMat, cardMat, doorMat, fixtureMat;
+    private Material guardMat, skinMat, capMat, beltMat, cardMat, doorMat, fixtureMat;
     private Texture wallTex, wallN, floorTex, floorN;
     private Skybox skybox;
 
@@ -113,6 +113,7 @@ public class PrisonScene implements Scene {
 
     private final Matrix4f projection = new Matrix4f();
     private final Matrix4f model = new Matrix4f();
+    private final Matrix4f guardBase = new Matrix4f();
     private final Vector3f tmp = new Vector3f();
     private final Vector3f barLight = new Vector3f(-0.3f, -1f, -0.25f).normalize();
 
@@ -139,8 +140,10 @@ public class PrisonScene implements Scene {
         floorTex = resources.texture("textures/floor.jpg");
         floorN = resources.texture("textures/floor_n.jpg");
         Texture white = resources.texture("textures/white.png");
-        guardMat = new Material(litShader, white).setTint(0.22f, 0.28f, 0.45f).setAmbientStrength(0.4f);
-        visorMat = new Material(litShader, white).setTint(1.0f, 0.85f, 0.3f).setAmbientStrength(0.8f);
+        guardMat = new Material(litShader, white).setTint(0.20f, 0.26f, 0.42f).setAmbientStrength(0.4f);
+        skinMat = new Material(litShader, white).setTint(0.80f, 0.62f, 0.48f).setAmbientStrength(0.5f);
+        capMat = new Material(litShader, white).setTint(0.11f, 0.13f, 0.22f).setAmbientStrength(0.4f);
+        beltMat = new Material(litShader, white).setTint(0.10f, 0.10f, 0.11f).setAmbientStrength(0.4f);
         cardMat = new Material(litShader, white).setAmbientStrength(0.9f);
         doorMat = new Material(litShader, white).setTint(0.45f, 0.32f, 0.2f).setAmbientStrength(0.35f);
         fixtureMat = new Material(litShader, white).setTint(1.0f, 0.95f, 0.8f).setAmbientStrength(1.0f);
@@ -392,18 +395,7 @@ public class PrisonScene implements Scene {
                 cubeMesh.render();
             }
         }
-        for (Guard g : guards) {
-            guardMat.use();
-            litShader.setUniform("uModel", model.identity().translate(g.position.x, 0.95f, g.position.z).scale(0.7f, 1.9f, 0.7f));
-            cubeMesh.render();
-            float fs = (float) Math.sin(g.facing());
-            float fc = (float) Math.cos(g.facing());
-            visorMat.use();
-            litShader.setUniform("uModel", model.identity()
-                    .translate(g.position.x + fs * 0.42f, 1.55f, g.position.z + fc * 0.42f)
-                    .rotateY(g.facing()).scale(0.55f, 0.22f, 0.2f));
-            cubeMesh.render();
-        }
+        for (Guard g : guards) renderGuard(g);
         fixtureMat.use();
         for (Vector3f f : fixtures) {
             litShader.setUniform("uModel", model.identity().translate(f).scale(2f, 0.15f, 2f));
@@ -437,6 +429,47 @@ public class PrisonScene implements Scene {
         glDisable(GL_BLEND);
 
         renderHud();
+    }
+
+    /**
+     * A blocky humanoid guard built from primitives, with a procedural walk:
+     * arms and legs swing in opposition driven by {@link Guard#walkPhase}, plus a
+     * subtle vertical bob. Local +Z is the guard's forward (rotateY(facing)).
+     */
+    private void renderGuard(Guard g) {
+        float swing = (float) Math.sin(g.walkPhase) * 0.5f;               // stride angle (rad)
+        float bob = Math.abs((float) Math.sin(g.walkPhase)) * 0.04f;      // body bounce
+        guardBase.identity().translate(g.position.x, bob, g.position.z).rotateY(g.facing());
+
+        guardMat.use();
+        part(0f, 1.24f, 0f, 0.52f, 0.82f, 0.30f);      // torso (uniform)
+        beltMat.use();
+        part(0f, 0.86f, 0f, 0.54f, 0.12f, 0.32f);      // belt
+        skinMat.use();
+        part(0f, 1.86f, 0f, 0.30f, 0.30f, 0.28f);      // head
+        capMat.use();
+        part(0f, 2.05f, 0f, 0.36f, 0.14f, 0.36f);      // cap crown
+        part(0f, 1.99f, 0.20f, 0.34f, 0.07f, 0.16f);   // cap peak (front)
+
+        guardMat.use();                                 // arms swing...
+        limb(-0.34f, 1.52f, 0f, swing, 0.68f, 0.15f, 0.15f);
+        limb(0.34f, 1.52f, 0f, -swing, 0.68f, 0.15f, 0.15f);
+        capMat.use();                                   // ...legs swing opposite
+        limb(-0.15f, 0.86f, 0f, -swing, 0.82f, 0.19f, 0.20f);
+        limb(0.15f, 0.86f, 0f, swing, 0.82f, 0.19f, 0.20f);
+    }
+
+    /** A box centered at (x,y,z) in guard-local space. */
+    private void part(float x, float y, float z, float sx, float sy, float sz) {
+        litShader.setUniform("uModel", model.set(guardBase).translate(x, y, z).scale(sx, sy, sz));
+        cubeMesh.render();
+    }
+
+    /** A limb box hanging from pivot (px,py,pz), rotated about X, extending len downward. */
+    private void limb(float px, float py, float pz, float rotX, float len, float sx, float sz) {
+        litShader.setUniform("uModel", model.set(guardBase)
+                .translate(px, py, pz).rotateX(rotX).translate(0f, -len / 2f, 0f).scale(sx, len, sz));
+        cubeMesh.render();
     }
 
     private void renderHud() {

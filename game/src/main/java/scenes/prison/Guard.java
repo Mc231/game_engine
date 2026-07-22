@@ -24,6 +24,7 @@ public class Guard {
     private int target;
     private float facing;
     private boolean alerted;
+    public float walkPhase;   // drives the procedural walk animation
 
     private final Vector3f forward = new Vector3f();
 
@@ -38,6 +39,7 @@ public class Guard {
         Vector3f t = waypoints[target];
         facing = (float) Math.atan2(t.x - position.x, t.z - position.z);
         alerted = false;
+        walkPhase = 0f;
     }
 
     public void update(float dt) {
@@ -53,6 +55,7 @@ public class Guard {
             position.x += dx * speed * dt;
             position.z += dz * speed * dt;
             facing = (float) Math.atan2(dx, dz);
+            walkPhase += speed * dt * 3.2f;   // stride cadence
         }
     }
 
