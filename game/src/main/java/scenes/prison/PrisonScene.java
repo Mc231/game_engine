@@ -7,6 +7,7 @@ import engine.Geometry;
 import engine.Hud;
 import engine.Input;
 import engine.InputMap;
+import engine.InstancedMesh;
 import engine.Light;
 import engine.Material;
 import engine.Mesh;
@@ -31,7 +32,7 @@ import static org.lwjgl.opengl.GL11.*;
 /**
  * Prison Break — a first-person stealth escape. Sneak from your cell through a
  * guard room (grab KEYCARD A), across the yard (grab KEYCARD B), and out the
- * gate — unseen. Guards' vision cones are shown on the floor (green = searching,
+ * gate — unseen. Guards' vision cones show on the floor (green = searching,
  * red = spotting you); get seen too long and you restart at your cell.
  *
  *   Move: W/A/S/D   Sneak: Ctrl   Use/open: E   Look: mouse   Start/Restart: Enter/R
@@ -53,14 +54,41 @@ public class PrisonScene implements Scene {
             out vec4 FragColor; uniform vec3 uColor; uniform float uAlpha;
             void main() { FragColor = vec4(uColor, uAlpha); }
             """;
+    private static final String BAR_VERT = """
+            #version 330 core
+            layout (location = 0) in vec3 aPos;
+            layout (location = 1) in vec3 aNormal;
+            layout (location = 2) in vec2 aUv;
+            layout (location = 3) in mat4 aInstance;
+            out vec3 vNormal;
+            uniform mat4 uView; uniform mat4 uProjection;
+            void main() {
+                vNormal = mat3(aInstance) * aNormal;
+                gl_Position = uProjection * uView * aInstance * vec4(aPos, 1.0);
+            }
+            """;
+    private static final String BAR_FRAG = """
+            #version 330 core
+            in vec3 vNormal;
+            out vec4 FragColor;
+            uniform vec3 uColor; uniform vec3 uLightDir;
+            void main() {
+                float d = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);
+                FragColor = vec4(uColor * (0.35 + 0.7 * d), 1.0);
+            }
+            """;
 
     private final ResourceManager resources = new ResourceManager();
     private ShaderProgram litShader;
+    private ShaderProgram litTriShader;
     private ShaderProgram flatShader;
+    private ShaderProgram barShader;
     private Mesh cubeMesh;
     private Mesh floorMesh;
     private Mesh coneMesh;
-    private Material wallMat, floorMat, guardMat, visorMat, cardMat, doorMat;
+    private InstancedMesh bars;
+    private Material guardMat, visorMat, cardMat, doorMat, fixtureMat;
+    private Texture wallTex, wallN, floorTex, floorN;
     private Skybox skybox;
 
     private final List<Matrix4f> wallModels = new ArrayList<>();
@@ -72,6 +100,7 @@ public class PrisonScene implements Scene {
     private AABB exit;
     private final Matrix4f floorModel = new Matrix4f().translate(0f, 0f, 43f);
     private final Light[] lights = new Light[3];
+    private final Vector3f[] fixtures = {new Vector3f(0f, 3.88f, 15f), new Vector3f(0f, 3.88f, 40f)};
 
     private PrisonPlayer player;
     private final Set<String> inventory = new HashSet<>();
@@ -85,21 +114,19 @@ public class PrisonScene implements Scene {
     private final Matrix4f projection = new Matrix4f();
     private final Matrix4f model = new Matrix4f();
     private final Vector3f tmp = new Vector3f();
+    private final Vector3f barLight = new Vector3f(-0.3f, -1f, -0.25f).normalize();
 
     private State state = State.TITLE;
-    private float detection = 0f;
-    private float caughtFlash = 0f;
-    private float promptTimer = 0f;
+    private float detection = 0f, caughtFlash = 0f, promptTimer = 0f, spin = 0f, stepTimer = 0f, time = 0f;
     private String lockedMsg = "";
-    private float spin = 0f;
-    private float stepTimer = 0f;
-    private float time = 0f;
 
     @Override
     public void init(Window window) {
         this.window = window;
         litShader = resources.shader("shaders/lit.vert", "shaders/lit.frag");
+        litTriShader = resources.shader("shaders/lit.vert", "shaders/lit_tri.frag");
         flatShader = new ShaderProgram(FLAT_VERT, FLAT_FRAG);
+        barShader = new ShaderProgram(BAR_VERT, BAR_FRAG);
         cubeMesh = new Mesh(Geometry.cubeWithNormalsAndUV(), new int[]{3, 3, 2});
         floorMesh = new Mesh(Geometry.plane(48f, 48f), new int[]{3, 3, 2});
         coneMesh = buildCone();
@@ -107,17 +134,19 @@ public class PrisonScene implements Scene {
                 "skybox/right.png", "skybox/left.png", "skybox/top.png",
                 "skybox/bottom.png", "skybox/front.png", "skybox/back.png"));
 
-        Texture wall = resources.texture("textures/wall.jpg");
-        Texture floor = resources.texture("textures/floor.jpg");
+        wallTex = resources.texture("textures/wall.jpg");
+        wallN = resources.texture("textures/wall_n.jpg");
+        floorTex = resources.texture("textures/floor.jpg");
+        floorN = resources.texture("textures/floor_n.jpg");
         Texture white = resources.texture("textures/white.png");
-        wallMat = new Material(litShader, wall).setAmbientStrength(0.28f).setSpecularStrength(0.05f).setShininess(6f);
-        floorMat = new Material(litShader, floor).setAmbientStrength(0.28f).setSpecularStrength(0.05f).setShininess(6f);
         guardMat = new Material(litShader, white).setTint(0.22f, 0.28f, 0.45f).setAmbientStrength(0.4f);
         visorMat = new Material(litShader, white).setTint(1.0f, 0.85f, 0.3f).setAmbientStrength(0.8f);
         cardMat = new Material(litShader, white).setAmbientStrength(0.9f);
         doorMat = new Material(litShader, white).setTint(0.45f, 0.32f, 0.2f).setAmbientStrength(0.35f);
+        fixtureMat = new Material(litShader, white).setTint(1.0f, 0.95f, 0.8f).setAmbientStrength(1.0f);
 
         buildLevel();
+        bars = buildBars();
 
         lights[0] = Light.directional(new Vector3f(-0.3f, -1f, -0.25f), new Vector3f(0.55f, 0.55f, 0.6f));
         lights[1] = Light.point(new Vector3f(0f, 3.6f, 15f), new Vector3f(1f, 0.9f, 0.7f));
@@ -146,40 +175,54 @@ public class PrisonScene implements Scene {
 
     private void buildLevel() {
         float H = 4f;
-        // Perimeter (z 0..86, x -8..8).
         addWall(-8f, 2f, 43f, 0.6f, H, 86f);
         addWall(8f, 2f, 43f, 0.6f, H, 86f);
-        addWall(0f, 2f, 0f, 16.6f, H, 0.6f);        // back (cell)
+        addWall(0f, 2f, 0f, 16.6f, H, 0.6f);
         addWall(0f, 4f, 25f, 16f, 0.3f, 50f);       // indoor ceiling (blocks sky over z 0..50)
-        // Room dividers with a central 3-wide doorway.
-        divider(30f, null);   // cell/corridor -> guard room (open)
-        divider(50f, "A");    // guard room -> yard (Door needs keycard A)
-        divider(82f, "B");    // yard -> gate (Door needs keycard B)
-        // Desk holding keycard A.
-        addWall(5f, 0.5f, 40f, 2.2f, 1f, 1.2f);
+        divider(30f, null);
+        divider(50f, "A");
+        divider(82f, "B");
+        addWall(5f, 0.5f, 40f, 2.2f, 1f, 1.2f);      // desk
 
-        keycards.add(new Keycard("A", 5f, 1.15f, 40f, new Vector3f(0.2f, 0.9f, 1f)));   // guard room
-        keycards.add(new Keycard("B", -6f, 1f, 66f, new Vector3f(1f, 0.4f, 0.7f)));      // yard
+        keycards.add(new Keycard("A", 5f, 1.15f, 40f, new Vector3f(0.2f, 0.9f, 1f)));
+        keycards.add(new Keycard("B", -6f, 1f, 66f, new Vector3f(1f, 0.4f, 0.7f)));
 
-        guards.add(new Guard(new Vector3f[]{new Vector3f(0f, 0f, 13f), new Vector3f(0f, 0f, 27f)}));    // corridor
-        guards.add(new Guard(new Vector3f[]{new Vector3f(-5f, 0f, 35f), new Vector3f(5f, 0f, 46f)}));   // guard room
-        guards.add(new Guard(new Vector3f[]{new Vector3f(-8f, 0f, 58f), new Vector3f(8f, 0f, 76f)}));   // yard
+        guards.add(new Guard(new Vector3f[]{new Vector3f(0f, 0f, 13f), new Vector3f(0f, 0f, 27f)}));
+        guards.add(new Guard(new Vector3f[]{new Vector3f(-5f, 0f, 35f), new Vector3f(5f, 0f, 46f)}));
+        guards.add(new Guard(new Vector3f[]{new Vector3f(-8f, 0f, 58f), new Vector3f(8f, 0f, 76f)}));
 
         exit = AABB.fromCenterSize(new Vector3f(0f, 1.5f, 84.5f), new Vector3f(3f, 3f, 3f));
         rebuildColliders();
     }
 
     private void divider(float z, String key) {
-        addWall(-4.75f, 2f, z, 6.5f, 4f, 0.6f);   // left segment  (x -8..-1.5)
-        addWall(4.75f, 2f, z, 6.5f, 4f, 0.6f);    // right segment (x 1.5..8)
+        addWall(-4.75f, 2f, z, 6.5f, 4f, 0.6f);
+        addWall(4.75f, 2f, z, 6.5f, 4f, 0.6f);
         if (key != null) {
-            doors.add(new Door(key, 0f, 1.5f, z, 3f, 3f, 0.5f));   // door fills the doorway
+            doors.add(new Door(key, 0f, 1.5f, z, 3f, 3f, 0.5f));
         }
     }
 
     private void addWall(float cx, float cy, float cz, float sx, float sy, float sz) {
         wallModels.add(new Matrix4f().translate(cx, cy, cz).scale(sx, sy, sz));
         staticWalls.add(AABB.fromCenterSize(new Vector3f(cx, cy, cz), new Vector3f(sx, sy, sz)));
+    }
+
+    /** Decorative cell bars across the cell front (z=10), with a doorway gap. */
+    private InstancedMesh buildBars() {
+        List<Matrix4f> inst = new ArrayList<>();
+        float z = 10f;
+        for (float x = -7.4f; x <= 7.4f; x += 0.55f) {
+            if (Math.abs(x) < 1.7f) continue;
+            inst.add(new Matrix4f().translate(x, 1.75f, z).scale(0.06f, 3.4f, 0.06f));
+        }
+        for (float y : new float[]{0.35f, 3.3f}) {
+            inst.add(new Matrix4f().translate(-4.6f, y, z).scale(5.8f, 0.07f, 0.07f));
+            inst.add(new Matrix4f().translate(4.6f, y, z).scale(5.8f, 0.07f, 0.07f));
+        }
+        int[] idx = new int[36];
+        for (int i = 0; i < 36; i++) idx[i] = i;
+        return new InstancedMesh(Geometry.cubeWithNormalsAndUV(), new int[]{3, 3, 2}, idx, inst.toArray(new Matrix4f[0]));
     }
 
     private void rebuildColliders() {
@@ -227,7 +270,6 @@ public class PrisonScene implements Scene {
             return;
         }
 
-        // PLAYING
         time += deltaSeconds;
         player.addLook(input.mouseDeltaX(), input.mouseDeltaY());
         float forward = (actions.isDown("forward", input) ? 1f : 0f) - (actions.isDown("back", input) ? 1f : 0f);
@@ -235,7 +277,6 @@ public class PrisonScene implements Scene {
         boolean sneak = actions.isDown("sneak", input);
         player.update(deltaSeconds, forward, strafe, sneak, activeWalls);
 
-        // Footsteps.
         if (forward != 0f || strafe != 0f) {
             stepTimer -= deltaSeconds;
             if (stepTimer <= 0f) {
@@ -244,7 +285,6 @@ public class PrisonScene implements Scene {
             }
         }
 
-        // Interact (E): pick up a keycard, else open a nearby door.
         if (input.isKeyPressed(GLFW_KEY_E)) {
             boolean handled = false;
             for (Keycard k : keycards) {
@@ -272,7 +312,6 @@ public class PrisonScene implements Scene {
             }
         }
 
-        // Guards + detection.
         boolean seen = false;
         for (Guard g : guards) {
             g.update(deltaSeconds);
@@ -301,7 +340,35 @@ public class PrisonScene implements Scene {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         Matrix4f view = player.viewMatrix();
 
-        // Lit world.
+        // --- Walls + floor: concrete color + normal maps (world-projected) ---
+        litTriShader.bind();
+        litTriShader.setUniform("uProjection", projection);
+        litTriShader.setUniform("uView", view);
+        litTriShader.setUniform("uViewPos", player.position);
+        litTriShader.setUniform("uTint", tmp.set(1f, 1f, 1f));
+        litTriShader.setUniform("uAmbientStrength", 0.3f);
+        litTriShader.setUniform("uSpecularStrength", 0.06f);
+        litTriShader.setUniform("uShininess", 8f);
+        litTriShader.setUniform("uLightCount", lights.length);
+        for (int i = 0; i < lights.length; i++) lights[i].apply(litTriShader, "uLights[" + i + "]");
+
+        floorTex.bind(0);
+        litTriShader.setUniform("uTexture", 0);
+        floorN.bind(1);
+        litTriShader.setUniform("uNormalMap", 1);
+        litTriShader.setUniform("uTexScale", 0.3f);
+        litTriShader.setUniform("uModel", floorModel);
+        floorMesh.render();
+
+        wallTex.bind(0);
+        wallN.bind(1);
+        litTriShader.setUniform("uTexScale", 0.4f);
+        for (Matrix4f m : wallModels) {
+            litTriShader.setUniform("uModel", m);
+            cubeMesh.render();
+        }
+
+        // --- Colored props: doors, keycards, guards, ceiling fixtures ---
         litShader.bind();
         litShader.setUniform("uProjection", projection);
         litShader.setUniform("uView", view);
@@ -310,16 +377,6 @@ public class PrisonScene implements Scene {
         litShader.setUniform("uLightCount", lights.length);
         for (int i = 0; i < lights.length; i++) lights[i].apply(litShader, "uLights[" + i + "]");
 
-        floorMat.use();
-        litShader.setUniform("uModel", floorModel);
-        floorMesh.render();
-
-        wallMat.use();
-        for (Matrix4f m : wallModels) {
-            litShader.setUniform("uModel", m);
-            cubeMesh.render();
-        }
-
         doorMat.use();
         for (Door d : doors) {
             if (!d.open) {
@@ -327,7 +384,6 @@ public class PrisonScene implements Scene {
                 cubeMesh.render();
             }
         }
-
         cardMat.use();
         for (Keycard k : keycards) {
             if (!k.collected) {
@@ -336,8 +392,6 @@ public class PrisonScene implements Scene {
                 cubeMesh.render();
             }
         }
-
-        // Guards (body + facing visor).
         for (Guard g : guards) {
             guardMat.use();
             litShader.setUniform("uModel", model.identity().translate(g.position.x, 0.95f, g.position.z).scale(0.7f, 1.9f, 0.7f));
@@ -350,10 +404,23 @@ public class PrisonScene implements Scene {
                     .rotateY(g.facing()).scale(0.55f, 0.22f, 0.2f));
             cubeMesh.render();
         }
+        fixtureMat.use();
+        for (Vector3f f : fixtures) {
+            litShader.setUniform("uModel", model.identity().translate(f).scale(2f, 0.15f, 2f));
+            cubeMesh.render();
+        }
+
+        // --- Cell bars (instanced) ---
+        barShader.bind();
+        barShader.setUniform("uProjection", projection);
+        barShader.setUniform("uView", view);
+        barShader.setUniform("uLightDir", barLight);
+        barShader.setUniform("uColor", tmp.set(0.5f, 0.52f, 0.56f));
+        bars.render();
 
         skybox.render(view, projection);
 
-        // Vision cones (translucent, on the floor).
+        // --- Vision cones ---
         flatShader.bind();
         flatShader.setUniform("uProjection", projection);
         flatShader.setUniform("uView", view);
@@ -395,7 +462,6 @@ public class PrisonScene implements Scene {
         bar.append(']');
         hud.text(12, 64, 2f, bar.toString(), 0.4f + detection * 0.6f, 1f - detection * 0.7f, 0.3f);
 
-        // Crosshair + interaction prompt.
         hud.text(cx - 5f, cyy - 8f, 2f, "+", 1f, 1f, 1f);
         String prompt = nearPrompt();
         if (prompt != null) hud.text(cx - 90f, cyy + 24f, 2f, prompt, 1f, 1f, 0.6f);
@@ -450,8 +516,10 @@ public class PrisonScene implements Scene {
         cubeMesh.dispose();
         floorMesh.dispose();
         coneMesh.dispose();
+        bars.dispose();
         skybox.dispose();
         flatShader.dispose();
+        barShader.dispose();
         hud.dispose();
         sPickup.dispose();
         sUnlock.dispose();
