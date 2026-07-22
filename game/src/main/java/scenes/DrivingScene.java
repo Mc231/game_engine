@@ -109,9 +109,9 @@ public class DrivingScene implements Scene {
         float throttle = (actions.isDown("accel", input) ? 1f : 0f)
                 - (actions.isDown("reverse", input) ? 1f : 0f)
                 - deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_LEFT_Y));
-        float steer = (actions.isDown("right", input) ? 1f : 0f)
-                - (actions.isDown("left", input) ? 1f : 0f)
-                + deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_LEFT_X));
+        float steer = (actions.isDown("left", input) ? 1f : 0f)
+                - (actions.isDown("right", input) ? 1f : 0f)
+                - deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_LEFT_X));
         boolean brake = actions.isDown("brake", input) || gamepad.button(GLFW_GAMEPAD_BUTTON_B);
 
         controller.update(deltaSeconds, clamp(throttle), clamp(steer), brake, terrain::heightAt);
