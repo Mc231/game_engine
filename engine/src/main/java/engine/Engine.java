@@ -11,15 +11,31 @@ import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Owns the {@link Window} and runs the main loop over one or more {@link Scene}s.
- * Only the current scene is initialized; number keys 1..9 switch scenes,
- * disposing the old one and initializing the new one.
+ * Only the current scene is initialized; number keys 1..9 (and 0 for a 10th)
+ * switch scenes, disposing the old one and initializing the new one.
+ *
+ * The loop uses a fixed-timestep accumulator: simulation ({@link Scene#fixedUpdate})
+ * runs at a constant {@link #FIXED_DT} independent of frame rate, while
+ * {@link Scene#update} (input, camera) and {@link Scene#render} run once per
+ * frame. Framebuffer resizes are dispatched to {@link Scene#resize}.
  */
 public class Engine {
+
+    /** Fixed simulation step: 60 Hz. */
+    private static final float FIXED_DT = 1f / 60f;
+    /** Clamp huge frame gaps (breakpoints, stalls) to avoid a spiral of death. */
+    private static final double MAX_FRAME_TIME = 0.25;
 
     private final WindowConfig config;
     private final List<Scene> scenes;
     private final Window window;
+    private final Time time = new Time();
+
     private int current = 0;
+    private String sceneLabel = "";
+    private int lastFbWidth = -1;
+    private int lastFbHeight = -1;
+    private double lastTitleUpdate = 0;
 
     public Engine(WindowConfig config, Scene scene) {
         this(config, List.of(scene));
@@ -38,6 +54,7 @@ public class Engine {
         try {
             window.create();
             GL.createCapabilities();
+            GLDebug.enable();               // OpenGL debug output where supported
             glEnable(GL_DEPTH_TEST);
             activate(0, true);
             loop();
@@ -58,17 +75,30 @@ public class Engine {
         current = index;
         Scene scene = scenes.get(current);
         scene.init(window);
-        window.setTitle(config.title + "  [" + (current + 1) + "/" + scenes.size() + "] " + scene.name());
+
+        // Match the scene to the current framebuffer size right away.
+        lastFbWidth = window.framebufferWidth();
+        lastFbHeight = window.framebufferHeight();
+        if (lastFbHeight > 0) {
+            scene.resize(lastFbWidth, lastFbHeight);
+        }
+
+        sceneLabel = config.title + "  [" + (current + 1) + "/" + scenes.size() + "] " + scene.name();
+        window.setTitle(sceneLabel);
     }
 
     private void loop() {
         glClearColor(config.clearR, config.clearG, config.clearB, config.clearA);
 
         double lastTime = glfwGetTime();
+        lastTitleUpdate = lastTime;
+        double accumulator = 0;
+
         while (!window.shouldClose()) {
             double now = glfwGetTime();
-            float deltaSeconds = (float) (now - lastTime);
+            double frameTime = Math.min(now - lastTime, MAX_FRAME_TIME);
             lastTime = now;
+            time.update(now);
 
             window.pollEvents();
             window.input().update();
@@ -82,14 +112,38 @@ public class Engine {
                 activate(9, false);   // the 0 key selects the 10th scene
             }
 
-            // Reset viewport every frame so scenes that change it (e.g. shadows) recover.
-            glViewport(0, 0, window.framebufferWidth(), window.framebufferHeight());
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            Scene scene = scenes.get(current);
 
-            scenes.get(current).update(deltaSeconds);
-            scenes.get(current).render();
+            // Dispatch framebuffer resizes.
+            int fbWidth = window.framebufferWidth();
+            int fbHeight = window.framebufferHeight();
+            if ((fbWidth != lastFbWidth || fbHeight != lastFbHeight) && fbHeight > 0) {
+                scene.resize(fbWidth, fbHeight);
+                lastFbWidth = fbWidth;
+                lastFbHeight = fbHeight;
+            }
+
+            // Fixed-timestep simulation: catch up in constant steps.
+            accumulator += frameTime;
+            while (accumulator >= FIXED_DT) {
+                scene.fixedUpdate(FIXED_DT);
+                accumulator -= FIXED_DT;
+            }
+
+            // Variable per-frame update + render.
+            scene.update((float) frameTime);
+
+            glViewport(0, 0, fbWidth, fbHeight);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            scene.render();
 
             window.swapBuffers();
+
+            // Refresh the FPS readout in the title about once per second.
+            if (now - lastTitleUpdate >= 1.0) {
+                window.setTitle(sceneLabel + "  —  " + time.fps() + " fps");
+                lastTitleUpdate = now;
+            }
         }
     }
 }

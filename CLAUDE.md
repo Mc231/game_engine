@@ -48,15 +48,15 @@ Do **not** use the green-arrow "run `main()`" — on macOS it fails with exit 1 
 Two Gradle modules:
 
 - **`:engine`** (`engine/src/main/java/engine/`) — the reusable engine library. Depends on nothing in the game; the module boundary makes an engine→game import a compile error.
-- **`:game`** (`game/src/main/java/`) — depends on `:engine`. Contains `Main` (default package; the entry point that builds a `WindowConfig` and hands the `Engine` an ordered `List<Scene>`), the `scenes/` package (one class per demo, each implementing `engine.Scene`), and the resources.
+- **`:game`** (`game/src/main/java/`) — depends on `:engine`. Contains `Main` (default package; the entry point, which uses `Application.create()…scene(…)…run()` to configure the window and register scenes), the `scenes/` package (one class per demo, each implementing `engine.Scene`), and the resources.
 
 ### The core loop and scene model
 
 `Engine` owns the `Window` and runs the frame loop. It holds a `List<Scene>` but **only the currently active scene is initialized** — switching disposes the old scene and inits the new one. Number keys `1`–`9` (and `0` for a 10th) switch scenes at runtime; the window title reflects the active scene.
 
-`Scene` is the extension point: `init(Window)` → `update(float deltaSeconds)` / `render()` each frame → `dispose()`. To add a demo, implement `Scene` in `scenes/` and add one line to the list in `Main`.
+`Scene` is the extension point: `init(Window)` once → per frame `fixedUpdate(step)` (0+ times) / `update(deltaSeconds)` / `render()` → `resize(w,h)` on framebuffer changes → `dispose()`. `fixedUpdate`, `resize`, and `name` are `default` no-ops, so most scenes only implement init/update/render/dispose. To add a scene, implement `Scene` in `scenes/` and register it via `Application.scene(...)` in `Main`.
 
-Frame order in `Engine.loop()`: poll events → refresh input → handle scene-switch keys → reset viewport to the framebuffer size → clear → `update` → `render` → swap.
+The loop is **fixed-timestep**: `fixedUpdate` runs at a constant 60 Hz (accumulator), while `update`/`render` run once per frame — put deterministic simulation/physics in `fixedUpdate`, input/camera in `update`. Frame order in `Engine.loop()`: poll events → refresh input → scene-switch keys → dispatch `resize` on size change → `fixedUpdate` steps → `update` → viewport + clear → `render` → swap. `Time` tracks FPS (shown in the window title); `GLDebug.enable()` wires OpenGL debug output where supported.
 
 ### Rendering component model
 

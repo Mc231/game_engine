@@ -12,8 +12,11 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 
 **Core / platform**
 - Windowing & OpenGL 3.3 core context (`Window`, `WindowConfig` fluent builder).
-- Cross-platform native detection in `build.gradle` (macOS arm64/x64, Windows, Linux).
-- Main loop with delta time, depth testing, per-frame viewport reset (`Engine`).
+- Cross-platform native detection (macOS arm64/x64, Windows, Linux).
+- **Fixed-timestep** loop (`Scene.fixedUpdate` at 60 Hz) + variable per-frame update/render, depth testing, per-frame viewport reset (`Engine`).
+- **Window resize handling** — framebuffer-size changes dispatched to `Scene.resize`.
+- **Frame timing & FPS** (`Time`, shown in window title), leveled logging (`Log`), GL debug output (`GLDebug`).
+- Fluent **`Application`** bootstrap — define a whole game (config + scenes) in one place.
 - Runtime **scene switching** via number keys; only the active scene is initialized.
 - **Input**: polled key state, edge-detected key presses, mouse-look deltas, mouse capture (`Input`).
 - Explicit GPU-resource lifetime via `Disposable`.
@@ -55,9 +58,12 @@ _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 
 | Class | Responsibility |
 |---|---|
-| `Engine` | Owns the window, runs the loop, manages/switches scenes |
+| `Application` | Fluent bootstrap: config + scene registration → run |
+| `Engine` | Owns the window, runs the fixed-timestep loop, manages/switches scenes |
 | `Window`, `WindowConfig` | GLFW window + context + config |
-| `Scene` | Content interface: init/update/render/dispose(+name) |
+| `Scene` | Content interface: init/update/fixedUpdate/render/resize/dispose(+name) |
+| `Time` | Frame delta, elapsed, frame count, smoothed FPS |
+| `Log`, `GLDebug` | Leveled logging + OpenGL debug output / error checks |
 | `Input` | Keyboard/mouse polling, edge presses, mouse capture |
 | `Camera` | Fly camera → view matrix |
 | `Mesh` | Geometry buffers + draw |
@@ -78,12 +84,12 @@ _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 
 Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 
-### A. Engine foundation (do these first — everything else builds on them)
-- **★★ Scene/game separation & `Application` bootstrap** — a clean entry API so a *game* is defined without touching `Main` (register scenes, set config in one place).
-- **★★ Fixed-timestep update loop** — decouple physics/logic from render rate (accumulator pattern); keeps simulation deterministic.
-- **★ Window resize handling** — framebuffer-size callback → update viewport + projection aspect (currently fixed at init).
-- **★★ Time & frame stats** — `Time` (delta, elapsed, fps) + on-screen or title FPS.
-- **★★ Logging + GL debug callback** — surface GL errors immediately instead of silent failures.
+### A. Engine foundation ✅ DONE
+- ✅ **`Application` bootstrap** — fluent entry API (`Application.create().title(...).scene(...).run()`); a game is defined in one place. `Main` uses it.
+- ✅ **Fixed-timestep update loop** — accumulator in `Engine`; `Scene.fixedUpdate(step)` runs at 60 Hz independent of frame rate; `update(dt)`/`render()` stay per-frame.
+- ✅ **Window resize handling** — `Engine` dispatches framebuffer-size changes to `Scene.resize(w,h)`; all perspective scenes rebuild their projection aspect.
+- ✅ **Time & frame stats** — `Time` (delta, elapsed, frameCount, smoothed fps); FPS shown in the window title.
+- ✅ **Logging + GL debug** — `Log` (leveled) + `GLDebug` (debug-output callback where supported, `checkError` fallback for macOS's 4.1 context).
 
 ### B. Content & scene structure
 - **★★ Entity/Component model (mini-ECS)** — components (Transform, MeshRenderer, Light, Script) on entities; a `World` that updates/renders them. This is the backbone of a real engine.
@@ -119,8 +125,8 @@ Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 
 A pragmatic order to reach "can build a small game":
 
-1. **Foundation:** fixed-timestep loop + resize handling + FPS/time (A). Small, unblocks everything.
-2. **Structure:** mini-ECS + resource manager (B). Turns "hardcoded scenes" into "data-driven worlds."
+1. ~~**Foundation:** fixed-timestep loop + resize handling + FPS/time (A).~~ ✅ **DONE**
+2. **Structure:** mini-ECS + resource manager (B). Turns "hardcoded scenes" into "data-driven worlds." ← next
 3. **Playable world:** terrain collision + input actions + a character controller (D). First real "game feel."
 4. **Polish the look:** skybox + text/HUD + audio (C/D). Now it looks and sounds like a game.
 5. **Pipeline:** scene serialization + settings (E). Author levels without recompiling.

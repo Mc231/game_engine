@@ -53,6 +53,13 @@ public class TerrainScene implements Scene {
     }
 
     @Override
+    public void resize(int width, int height) {
+        if (height == 0) return;                 // ignore minimized/degenerate
+        projection.identity().perspective(
+                (float) Math.toRadians(60.0), (float) width / height, 0.5f, 1200f);
+    }
+
+    @Override
     public void render() {
         // Override the engine's clear color with a sky color (fog fades to this).
         glClearColor(sky.x, sky.y, sky.z, 1f);

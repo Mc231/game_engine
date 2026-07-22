@@ -180,6 +180,13 @@ public class MaterialScene implements Scene {
     }
 
     @Override
+    public void resize(int width, int height) {
+        if (height == 0) return;                 // ignore minimized/degenerate
+        projection.identity().perspective(
+                (float) Math.toRadians(45.0), (float) width / height, 0.1f, 100f);
+    }
+
+    @Override
     public void render() {
         Matrix4f view = camera.viewMatrix();
 

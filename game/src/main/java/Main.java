@@ -1,6 +1,4 @@
-import engine.Engine;
-import engine.Scene;
-import engine.WindowConfig;
+import engine.Application;
 import scenes.CameraCubeScene;
 import scenes.LightsScene;
 import scenes.LitCubeScene;
@@ -11,33 +9,26 @@ import scenes.TerrainScene;
 import scenes.TexturedCubeScene;
 import scenes.TriangleScene;
 
-import java.util.List;
-
 /**
- * Entry point. Configures a window and hands the Engine a list of scenes.
- * Switch scenes at runtime with the number keys (1..9, then 0 for the 10th).
+ * Entry point. Defines the whole game in one fluent block: window config +
+ * the scenes to register. Switch scenes at runtime with the number keys
+ * (1..9, then 0 for a 10th).
  */
 public class Main {
     public static void main(String[] args) {
-        WindowConfig config = WindowConfig.builder()
-                .size(1000, 700)
+        Application.create()
                 .title("LWJGL Engine")
-                .vsync(true)
+                .size(1000, 700)
                 .clearColor(0.05f, 0.05f, 0.07f, 1.0f)
-                .build();
-
-        List<Scene> scenes = List.of(
-                new TriangleScene(),        // 1
-                new TexturedCubeScene(),    // 2
-                new CameraCubeScene(),      // 3
-                new LitCubeScene(),         // 4
-                new MaterialScene(),        // 5
-                new LightsScene(),          // 6
-                new ModelScene(),           // 7
-                new ShadowScene(),          // 8
-                new TerrainScene()          // 9
-        );
-
-        new Engine(config, scenes).run();
+                .scene(new TriangleScene())        // 1
+                .scene(new TexturedCubeScene())    // 2
+                .scene(new CameraCubeScene())      // 3
+                .scene(new LitCubeScene())         // 4
+                .scene(new MaterialScene())        // 5
+                .scene(new LightsScene())          // 6
+                .scene(new ModelScene())           // 7
+                .scene(new ShadowScene())          // 8
+                .scene(new TerrainScene())         // 9
+                .run();
     }
 }
