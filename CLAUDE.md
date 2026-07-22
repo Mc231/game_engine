@@ -83,6 +83,14 @@ Beyond the direct `GameObject`+`Mesh` approach, the engine has a small ECS: `Ent
 - **`Hud`** — a 2D text overlay via stb_easy_font; quads are expanded to triangles for the core profile. `begin(w,h)` (framebuffer size) → `text(...)` → `end()`.
 - `WalkScene` integrates all of the above walking on the `Terrain`.
 
+### Advanced rendering
+
+- **`Skybox`** (+ `CubemapTexture`) — a 6-face cubemap drawn with the camera's rotation but no translation (locked to the viewer); render it after opaque geometry.
+- **`Framebuffer`** — render-to-texture target (color texture + depth renderbuffer). Bind it, draw the scene, `unbind(screenW, screenH)`, then sample its color texture.
+- **`PostProcessor`** — a full-screen pass that samples a `Framebuffer` and applies an effect (`NONE`/`GRAYSCALE`/`INVERT`/`VIGNETTE`); the base for bloom/FXAA later.
+- **`InstancedMesh`** — one mesh drawn many times via `glDrawElementsInstanced` with a per-instance `mat4` attribute at locations `base..base+3` (base = the count of the mesh's own attributes, e.g. 3 for `{3,3,2}`); the shader declares `layout(location=3) in mat4 aInstance`.
+- `SkyboxScene` combines all three (instanced field under a sky, rendered through a post effect).
+
 ### Uniform-name conventions (contract between engine and shaders)
 
 Engine classes set uniforms by fixed names that shaders must declare:

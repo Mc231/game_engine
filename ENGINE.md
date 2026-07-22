@@ -28,6 +28,7 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 - `Material` — shader + texture + surface params; many materials share one shader.
 - `Transform` (pos/rot/scale) + `GameObject` (mesh + material + transform).
 - `Camera` — first-person fly camera.
+- **Skybox** (`Skybox` + `CubemapTexture`), **post-processing** (`Framebuffer` + `PostProcessor`), **instanced rendering** (`InstancedMesh`), **HUD text** (`Hud`).
 
 **Lighting**
 - Phong shading (ambient + diffuse + specular).
@@ -63,6 +64,7 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 9. `TerrainScene` — flyable procedural mountains
 0. `EcsScene` — entity-component + scene graph
 `[`/`]` → `WalkScene` — **walk the terrain** (gravity/jump, HUD, jump SFX)
+`[`/`]` → `SkyboxScene` — skybox + instanced field + post-FX (`E` to cycle)
 
 _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 
@@ -98,6 +100,9 @@ _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 | `CharacterController` | First-person walk: gravity, jump, ground-clamp |
 | `Audio`, `Sound` | OpenAL device/context + WAV playback |
 | `Hud` | 2D text overlay (stb_easy_font) |
+| `Skybox`, `CubemapTexture` | Cubemap sky locked to the camera |
+| `Framebuffer`, `PostProcessor` | Render-to-texture + full-screen post effects |
+| `InstancedMesh` | One mesh drawn many times (per-instance matrix) |
 | `Disposable` | GPU-resource cleanup contract |
 
 ---
@@ -119,14 +124,14 @@ Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 - ✅ **`Model` (multi-mesh) + material assignment** — `Model.load` splits an OBJ by `usemtl` into one mesh+material per group; `OBJLoader.parseModel` + `MtlLoader` read the .mtl (Kd/Ns/map_Kd). Demoed by `ModelScene` (3 colored cubes from one file).
 - ✅ **Resource/asset manager** — `ResourceManager` caches textures/shaders/meshes by key, loads once, disposes all centrally.
 
-### C. Rendering upgrades
-- **★★ Skybox / cubemap** — a real sky instead of flat fog color.
-- **★★ Normal mapping** — surface detail from a texture (needs tangents in the vertex format).
-- **★★ Transparency & blend ordering** — glass, foliage, particles.
-- **★★★ Framebuffer/post-processing stack** — bloom, tone mapping, FXAA, color grading.
-- **★★★ Point/spot shadows & multiple shadow casters** — cube-map shadows, cascaded shadow maps for large terrain.
-- **★★★ Instanced rendering** — draw thousands of grass/trees/rocks efficiently.
-- **★★★ Text rendering** — bitmap or SDF fonts (needed for UI/HUD/debug).
+### C. Rendering upgrades (partly ✅ DONE)
+- ✅ **Skybox / cubemap** — `CubemapTexture` + `Skybox` (6-face cubemap, locked to the camera).
+- ✅ **Framebuffer / post-processing** — `Framebuffer` (render-to-texture) + `PostProcessor` (grayscale/invert/vignette; the base for bloom/FXAA later).
+- ✅ **Instanced rendering** — `InstancedMesh` draws many objects in one call (per-instance mat4 attribute).
+- ✅ **Text rendering** — `Hud` via stb_easy_font (delivered in D).
+- **★★ Normal mapping** — surface detail from a texture (needs tangents in the vertex format). *(to do)*
+- **★★ Transparency & blend ordering** — glass, foliage, particles. *(to do)*
+- **★★★ Advanced shadows** — point/spot cube-map shadows, cascaded shadow maps. *(to do; directional shadows exist)*
 
 ### D. Gameplay systems (mostly ✅ DONE)
 - ✅ **Input mapping / actions** — `InputMap` binds named actions to keys (`isDown`/`isPressed`). *(gamepad not yet)*
@@ -150,8 +155,8 @@ A pragmatic order to reach "can build a small game":
 1. ~~**Foundation:** fixed-timestep loop + resize handling + FPS/time (A).~~ ✅ **DONE**
 2. ~~**Structure:** mini-ECS + resource manager + multi-material models (B).~~ ✅ **DONE**
 3. ~~**Playable world:** terrain collision + input actions + a character controller (D).~~ ✅ **DONE** (`WalkScene`)
-4. **Polish the look:** skybox + normal maps + post-processing (C); audio + HUD already done. ← next
-5. **Pipeline:** scene serialization + settings (E). Author levels without recompiling.
+4. ~~**Polish the look:** skybox + post-processing + instancing (C).~~ ✅ **DONE** (`SkyboxScene`; normal maps still open)
+5. **Pipeline:** scene serialization + settings (E). Author levels without recompiling. ← next
 
 After that, pick depth features (physics, post-processing, editor) based on the game being built.
 

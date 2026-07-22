@@ -6,6 +6,7 @@ import scenes.LitCubeScene;
 import scenes.MaterialScene;
 import scenes.ModelScene;
 import scenes.ShadowScene;
+import scenes.SkyboxScene;
 import scenes.TerrainScene;
 import scenes.TexturedCubeScene;
 import scenes.TriangleScene;
@@ -33,6 +34,7 @@ public class Main {
                 .scene(new TerrainScene())         // 9
                 .scene(new EcsScene())             // 0 (10th)
                 .scene(new WalkScene())            // 11th ([ / ] to reach)
+                .scene(new SkyboxScene())          // 12th ([ / ] to reach)
                 .run();
     }
 }
