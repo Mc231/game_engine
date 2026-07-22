@@ -1,0 +1,69 @@
+plugins {
+    id 'application'
+}
+
+// The LWJGL version we're learning with.
+project.ext.lwjglVersion = '3.3.4'
+
+// --- Detect the native binaries LWJGL needs for THIS machine ---------------
+// LWJGL is a thin Java layer over native C libraries (GLFW, OpenGL, ...).
+// Each OS + CPU combo needs its own precompiled natives, chosen via a Maven
+// "classifier". We detect it here so the build works on any machine.
+import org.gradle.internal.os.OperatingSystem
+
+switch (OperatingSystem.current()) {
+    case { it.isMacOsX() }:
+        project.ext.lwjglNatives = System.getProperty('os.arch').startsWith('aarch64')
+                ? 'natives-macos-arm64'   // Apple Silicon (M1/M2/M3...)
+                : 'natives-macos'         // Intel Macs
+        break
+    case { it.isWindows() }:
+        project.ext.lwjglNatives = 'natives-windows'
+        break
+    default: // Linux and the rest
+        project.ext.lwjglNatives = System.getProperty('os.arch').startsWith('aarch64')
+                ? 'natives-linux-arm64'
+                : 'natives-linux'
+        break
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // The BOM (Bill of Materials) pins every lwjgl artifact to one version,
+    // so we don't repeat the version number on each line below.
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+
+    // Java bindings (the ".jar" you compile against):
+    implementation 'org.lwjgl:lwjgl'          // core (memory, shared utils)
+    implementation 'org.lwjgl:lwjgl-glfw'     // windowing + input
+    implementation 'org.lwjgl:lwjgl-opengl'   // OpenGL rendering
+    implementation 'org.lwjgl:lwjgl-stb'      // image loading (stb_image)
+
+    // JOML — vectors & matrices for graphics math (pure Java, no natives):
+    implementation 'org.joml:joml:1.10.8'
+
+    // Native binaries (the actual .dylib/.dll/.so loaded at runtime):
+    runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-stb::$lwjglNatives"
+}
+
+application {
+    mainClass = 'Main'
+
+    // On macOS, GLFW (and any AWT/windowing) must run on the very first
+    // thread of the process. This JVM flag makes that happen.
+    if (OperatingSystem.current().isMacOsX()) {
+        applicationDefaultJvmArgs = ['-XstartOnFirstThread']
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
