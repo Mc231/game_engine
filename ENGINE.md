@@ -52,6 +52,10 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 - **HUD** (`Hud`): 2D text overlay via stb_easy_font (core-profile triangles).
 - Runtime scene cycling with `[` / `]` (beyond the 10 number keys).
 
+**Tooling / pipeline**
+- **Scene serialization**: `SceneData`/`EntityData`/`ComponentData` + `SceneSerializer` (Gson JSON) + `SceneBuilder` (JSON → live ECS `World`).
+- **Settings**: `Settings` reads resolution/vsync/sensitivity/volume from `settings.properties`.
+
 ### 🎬 Demo scenes (`scenes/`, switch with number keys `1`–`9`,`0`, or cycle with `[` / `]`)
 1. `TriangleScene` — first triangle
 2. `TexturedCubeScene` — textured cube
@@ -65,6 +69,7 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 0. `EcsScene` — entity-component + scene graph
 `[`/`]` → `WalkScene` — **walk the terrain** (gravity/jump, HUD, jump SFX)
 `[`/`]` → `SkyboxScene` — skybox + instanced field + post-FX (`E` to cycle)
+`[`/`]` → `SerializedScene` — a level loaded from `levels/demo.json`
 
 _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 
@@ -103,6 +108,8 @@ _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 | `Skybox`, `CubemapTexture` | Cubemap sky locked to the camera |
 | `Framebuffer`, `PostProcessor` | Render-to-texture + full-screen post effects |
 | `InstancedMesh` | One mesh drawn many times (per-instance matrix) |
+| `SceneData`, `SceneSerializer`, `SceneBuilder` | JSON level model, (de)serializer, and JSON → `World` builder |
+| `Settings` | User settings from a `.properties` file |
 | `Disposable` | GPU-resource cleanup contract |
 
 ---
@@ -140,11 +147,11 @@ Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 - ✅ **Audio** — `Audio` (OpenAL device/context) + `Sound` (WAV → buffer/source); `WalkScene` plays a jump SFX.
 - ✅ **UI/HUD layer** — `Hud` 2D text overlay (stb_easy_font). *(no widgets/buttons yet)*
 
-### E. Tooling & pipeline
-- **★★ Scene serialization** — save/load scenes & entities (JSON), so levels aren't hardcoded in Java.
-- **★★★ In-engine editor overlay** — inspect/tweak transforms, lights, materials at runtime (ImGui-style; LWJGL has bindings).
-- **★★ Config/settings** — resolution, vsync, key bindings from a file.
-- **★★★ Hot-reload** — reload shaders/textures on file change while running.
+### E. Tooling & pipeline (partly ✅ DONE)
+- ✅ **Scene serialization** — `SceneData`/`EntityData`/`ComponentData` + `SceneSerializer` (Gson JSON) + `SceneBuilder` (JSON → live `World`). `SerializedScene` loads `levels/demo.json`.
+- ✅ **Config/settings** — `Settings` loads resolution/vsync/sensitivity/volume from `settings.properties`; `Main` applies it.
+- **★★★ In-engine editor overlay** — inspect/tweak transforms, lights, materials at runtime (ImGui-style). *(to do)*
+- **★★★ Hot-reload** — reload shaders/textures on file change while running. *(to do)*
 
 ---
 
@@ -156,9 +163,9 @@ A pragmatic order to reach "can build a small game":
 2. ~~**Structure:** mini-ECS + resource manager + multi-material models (B).~~ ✅ **DONE**
 3. ~~**Playable world:** terrain collision + input actions + a character controller (D).~~ ✅ **DONE** (`WalkScene`)
 4. ~~**Polish the look:** skybox + post-processing + instancing (C).~~ ✅ **DONE** (`SkyboxScene`; normal maps still open)
-5. **Pipeline:** scene serialization + settings (E). Author levels without recompiling. ← next
+5. ~~**Pipeline:** scene serialization + settings (E).~~ ✅ **DONE** (JSON levels via `SerializedScene`; editor + hot-reload still open)
 
-After that, pick depth features (physics, post-processing, editor) based on the game being built.
+All five milestones are now hit. Remaining depth features (normal mapping, physics, in-engine editor, hot-reload) are optional, driven by the game being built.
 
 ---
 

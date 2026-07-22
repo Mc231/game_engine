@@ -91,6 +91,12 @@ Beyond the direct `GameObject`+`Mesh` approach, the engine has a small ECS: `Ent
 - **`InstancedMesh`** — one mesh drawn many times via `glDrawElementsInstanced` with a per-instance `mat4` attribute at locations `base..base+3` (base = the count of the mesh's own attributes, e.g. 3 for `{3,3,2}`); the shader declares `layout(location=3) in mat4 aInstance`.
 - `SkyboxScene` combines all three (instanced field under a sky, rendered through a post effect).
 
+### Tooling / pipeline
+
+- **Scene serialization** — levels are authored as JSON, not Java. `SceneData`/`EntityData`/`ComponentData` are the (flat, Gson-friendly) data model; `SceneSerializer` does JSON ↔ `SceneData` (+ `loadFromResource`/`saveToFile`); `SceneBuilder.build(sceneData, litShader, resources)` instantiates a live ECS `World`, pulling meshes/textures through the `ResourceManager` (so the scene disposes the manager, not individual assets). `SerializedScene` loads `game/src/main/resources/levels/demo.json`. Component descriptors are discriminated by a `type` string (`"mesh"` / `"light"`) with nullable fields — no Gson polymorphic adapters needed.
+- **Settings** — `Settings.load("settings.properties")` reads resolution/vsync/mouse-sensitivity/volume (defaults for missing/malformed keys, never throws); `Main` applies width/height/vsync to the `Application`. `Settings.fromProperties(Properties)` is the unit-tested pure seam.
+- The JSON library is **Gson** (`implementation` dep in `:engine` — internal, not exposed to `:game`).
+
 ### Uniform-name conventions (contract between engine and shaders)
 
 Engine classes set uniforms by fixed names that shaders must declare:

@@ -40,6 +40,9 @@ dependencies {
     api 'org.lwjgl:lwjgl-openal'   // audio (OpenAL)
     api 'org.joml:joml:1.10.8'
 
+    // JSON for scene serialization (engine-internal).
+    implementation 'com.google.code.gson:gson:2.11.0'
+
     // Native binaries: needed only at runtime. As runtimeOnly on a library,
     // they propagate to consumers' runtime classpath automatically.
     runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
