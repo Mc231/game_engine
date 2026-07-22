@@ -20,6 +20,8 @@ import org.joml.Vector3f;
 
 import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_AXIS_LEFT_X;
 import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_AXIS_LEFT_Y;
+import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_AXIS_RIGHT_X;
+import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_AXIS_RIGHT_Y;
 import static org.lwjgl.glfw.GLFW.GLFW_GAMEPAD_BUTTON_B;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_A;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_D;
@@ -45,8 +47,10 @@ import static org.lwjgl.opengl.GL11.glClearColor;
  */
 public class DrivingScene implements Scene {
 
-    /** If the car appears to drive backwards, flip this by Math.PI. */
-    private static final float MODEL_YAW_OFFSET = (float) Math.PI;
+    /** The Kenney model faces +Z already, matching our forward; no extra yaw. */
+    private static final float MODEL_YAW_OFFSET = 0f;
+
+    private static final float CAM_DISTANCE = 10f;
 
     private final ResourceManager resources = new ResourceManager();
     private ShaderProgram terrainShader;
@@ -74,6 +78,10 @@ public class DrivingScene implements Scene {
     private final Vector3f lightDir = new Vector3f(-0.4f, -1f, -0.3f).normalize();
     private final Vector3f sky = new Vector3f(0.62f, 0.74f, 0.88f);
 
+    // Orbit-camera angles (mouse-controlled): yaw is an offset from directly behind.
+    private float camYaw = 0f;
+    private float camPitch = 0.42f;
+
     @Override
     public void init(Window window) {
         this.window = window;
@@ -89,6 +97,7 @@ public class DrivingScene implements Scene {
         controller = new CarController().setPosition(140f, 0f, 0f).setHeading(0f);
 
         input = window.input();
+        input.setMouseCaptured(true);   // mouse orbits the camera around the car
         actions = new InputMap()
                 .bind("accel", GLFW_KEY_W, GLFW_KEY_UP)
                 .bind("reverse", GLFW_KEY_S, GLFW_KEY_DOWN)
@@ -116,11 +125,23 @@ public class DrivingScene implements Scene {
 
         controller.update(deltaSeconds, clamp(throttle), clamp(steer), brake, terrain::heightAt);
 
-        // Third-person chase camera: sit behind & above the car, smoothly.
+        // Orbit chase camera: auto-follows behind the car, mouse looks around.
+        camYaw += input.mouseDeltaX() * 0.005f
+                + deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_RIGHT_X)) * deltaSeconds * 2.5f;
+        camPitch += input.mouseDeltaY() * 0.005f
+                + deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_RIGHT_Y)) * deltaSeconds * 2.5f;
+        camPitch = Math.max(0.08f, Math.min(1.35f, camPitch));
+
         Vector3f carPos = controller.position();
-        Vector3f fwd = controller.forward();
-        desiredCam.set(carPos).sub(fwd.x * 9f, 0f, fwd.z * 9f).add(0f, 4.5f, 0f);
-        camPos.lerp(desiredCam, Math.min(deltaSeconds * 4f, 1f));
+        // Angle around the car = directly behind (heading + PI) + the mouse offset.
+        float a = controller.heading() + (float) Math.PI + camYaw;
+        float cp = (float) Math.cos(camPitch);
+        float sp = (float) Math.sin(camPitch);
+        desiredCam.set(carPos).add(
+                (float) Math.sin(a) * cp * CAM_DISTANCE,
+                sp * CAM_DISTANCE,
+                (float) Math.cos(a) * cp * CAM_DISTANCE);
+        camPos.lerp(desiredCam, Math.min(deltaSeconds * 6f, 1f));
         camTarget.set(carPos).add(0f, 1.2f, 0f);
         view.identity().lookAt(camPos, camTarget, up);
 
@@ -168,7 +189,7 @@ public class DrivingScene implements Scene {
         // --- HUD ---
         float kmh = Math.abs(controller.speed()) * 3.6f;
         hud.begin(window.framebufferWidth(), window.framebufferHeight());
-        hud.text(12, 12, 2f, "DRIVE  -  W/S or arrows, A/D steer, Space brake, [ ] scene", 1f, 1f, 1f);
+        hud.text(12, 12, 2f, "DRIVE  -  W/S drive, A/D steer, Space brake, mouse camera, [ ] scene", 1f, 1f, 1f);
         hud.text(12, 40, 3f, String.format("%3.0f km/h", kmh), 1f, 0.95f, 0.4f);
         hud.end();
     }
