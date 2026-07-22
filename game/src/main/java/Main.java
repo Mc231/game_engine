@@ -9,6 +9,7 @@ import scenes.ShadowScene;
 import scenes.TerrainScene;
 import scenes.TexturedCubeScene;
 import scenes.TriangleScene;
+import scenes.WalkScene;
 
 /**
  * Entry point. Defines the whole game in one fluent block: window config +
@@ -31,6 +32,7 @@ public class Main {
                 .scene(new ShadowScene())          // 8
                 .scene(new TerrainScene())         // 9
                 .scene(new EcsScene())             // 0 (10th)
+                .scene(new WalkScene())            // 11th ([ / ] to reach)
                 .run();
     }
 }

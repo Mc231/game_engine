@@ -44,16 +44,25 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 - **Scene graph / parenting**: `Entity` parent/children; `worldMatrix()` composes parent × local for multi-level hierarchies.
 - **`ResourceManager`**: caches textures/shaders/meshes by key (loads once), owns and disposes them centrally.
 
-### 🎬 Demo scenes (`scenes/`, switch with number keys)
+**Gameplay**
+- **Input actions** (`InputMap`): named actions → keys, `isDown`/`isPressed`.
+- **Character controller** (`CharacterController`): first-person walk, gravity, jump, ground-clamp to a height field.
+- **Audio** (`Audio` + `Sound`): OpenAL playback of WAV sound effects.
+- **HUD** (`Hud`): 2D text overlay via stb_easy_font (core-profile triangles).
+- Runtime scene cycling with `[` / `]` (beyond the 10 number keys).
+
+### 🎬 Demo scenes (`scenes/`, switch with number keys `1`–`9`,`0`, or cycle with `[` / `]`)
 1. `TriangleScene` — first triangle
 2. `TexturedCubeScene` — textured cube
 3. `CameraCubeScene` — fly camera through cubes
 4. `LitCubeScene` — Phong lighting
 5. `MaterialScene` — one shader, many materials
 6. `LightsScene` — directional + point + spot (flashlight on `F`)
-7. `ModelScene` — loaded .obj + file shaders
+7. `ModelScene` — multi-material `.obj`/`.mtl` model
 8. `ShadowScene` — directional shadows
 9. `TerrainScene` — flyable procedural mountains
+0. `EcsScene` — entity-component + scene graph
+`[`/`]` → `WalkScene` — **walk the terrain** (gravity/jump, HUD, jump SFX)
 
 _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 
@@ -85,6 +94,10 @@ _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 | `Entity`, `Component`, `World` | Mini-ECS: entities, components, and their container |
 | `MeshRenderer`, `LightComponent` | Built-in components (draw a mesh / carry a light) |
 | `ResourceManager` | Cache-by-key asset loading + central disposal |
+| `InputMap` | Named action → key bindings over `Input` |
+| `CharacterController` | First-person walk: gravity, jump, ground-clamp |
+| `Audio`, `Sound` | OpenAL device/context + WAV playback |
+| `Hud` | 2D text overlay (stb_easy_font) |
 | `Disposable` | GPU-resource cleanup contract |
 
 ---
@@ -115,12 +128,12 @@ Grouped by area, roughly ordered by value. ★ = effort (1 easy → 4 hard).
 - **★★★ Instanced rendering** — draw thousands of grass/trees/rocks efficiently.
 - **★★★ Text rendering** — bitmap or SDF fonts (needed for UI/HUD/debug).
 
-### D. Gameplay systems
-- **★★ Input mapping / actions** — bind "jump"/"fire" to keys/mouse/gamepad; gamepad support via GLFW.
-- **★★ Terrain collision & walking** — sample `Terrain.heightAt(x,z)` so the camera/player stands on the surface; character controller.
-- **★★★ Physics & collision** — AABB/sphere broadphase, raycasting; or integrate a library.
-- **★★ Audio** — sound effects + music via LWJGL's OpenAL (`lwjgl-openal`).
-- **★★ UI/HUD layer** — 2D overlay rendering (orthographic), buttons/text; consider Nuklear (`lwjgl-nuklear`).
+### D. Gameplay systems (mostly ✅ DONE)
+- ✅ **Input mapping / actions** — `InputMap` binds named actions to keys (`isDown`/`isPressed`). *(gamepad not yet)*
+- ✅ **Terrain collision & walking** — `CharacterController` (gravity, jump, ground-clamp to a height field); `WalkScene` walks the terrain via `Terrain.heightAt`.
+- **★★★ Physics & collision** — general AABB/sphere broadphase + raycasting. *(still to do — only terrain ground collision exists)*
+- ✅ **Audio** — `Audio` (OpenAL device/context) + `Sound` (WAV → buffer/source); `WalkScene` plays a jump SFX.
+- ✅ **UI/HUD layer** — `Hud` 2D text overlay (stb_easy_font). *(no widgets/buttons yet)*
 
 ### E. Tooling & pipeline
 - **★★ Scene serialization** — save/load scenes & entities (JSON), so levels aren't hardcoded in Java.
@@ -136,8 +149,8 @@ A pragmatic order to reach "can build a small game":
 
 1. ~~**Foundation:** fixed-timestep loop + resize handling + FPS/time (A).~~ ✅ **DONE**
 2. ~~**Structure:** mini-ECS + resource manager + multi-material models (B).~~ ✅ **DONE**
-3. **Playable world:** terrain collision + input actions + a character controller (D). First real "game feel." ← next
-4. **Polish the look:** skybox + text/HUD + audio (C/D). Now it looks and sounds like a game.
+3. ~~**Playable world:** terrain collision + input actions + a character controller (D).~~ ✅ **DONE** (`WalkScene`)
+4. **Polish the look:** skybox + normal maps + post-processing (C); audio + HUD already done. ← next
 5. **Pipeline:** scene serialization + settings (E). Author levels without recompiling.
 
 After that, pick depth features (physics, post-processing, editor) based on the game being built.

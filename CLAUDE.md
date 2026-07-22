@@ -41,7 +41,7 @@ Do **not** use the green-arrow "run `main()`" — on macOS it fails with exit 1 
 
 ## Platform natives
 
-`engine/build.gradle` auto-detects the OS/arch and selects the matching LWJGL native classifier (`natives-macos-arm64`, `natives-windows`, `natives-linux`, etc.), so no manual config is needed to build on a new machine. The LWJGL Java bindings + JOML are `api` dependencies of `:engine` (so `:game` gets them on its compile classpath); the natives are `runtimeOnly` (they propagate to `:game`'s runtime classpath automatically).
+`engine/build.gradle` auto-detects the OS/arch and selects the matching LWJGL native classifier (`natives-macos-arm64`, `natives-windows`, `natives-linux`, etc.), so no manual config is needed to build on a new machine. LWJGL modules in use: `lwjgl` (core), `-glfw`, `-opengl`, `-stb` (images + easy-font), `-openal` (audio), plus JOML. The Java bindings + JOML are `api` dependencies of `:engine` (so `:game` gets them on its compile classpath); the natives are `runtimeOnly` (they propagate to `:game`'s runtime classpath automatically).
 
 ## Architecture
 
@@ -52,7 +52,7 @@ Two Gradle modules:
 
 ### The core loop and scene model
 
-`Engine` owns the `Window` and runs the frame loop. It holds a `List<Scene>` but **only the currently active scene is initialized** — switching disposes the old scene and inits the new one. Number keys `1`–`9` (and `0` for a 10th) switch scenes at runtime; the window title reflects the active scene.
+`Engine` owns the `Window` and runs the frame loop. It holds a `List<Scene>` but **only the currently active scene is initialized** — switching disposes the old scene and inits the new one. Number keys `1`–`9` (and `0` for a 10th) select scenes; `[` / `]` cycle prev/next (for more than 10). The window title reflects the active scene.
 
 `Scene` is the extension point: `init(Window)` once → per frame `fixedUpdate(step)` (0+ times) / `update(deltaSeconds)` / `render()` → `resize(w,h)` on framebuffer changes → `dispose()`. `fixedUpdate`, `resize`, and `name` are `default` no-ops, so most scenes only implement init/update/render/dispose. To add a scene, implement `Scene` in `scenes/` and register it via `Application.scene(...)` in `Main`.
 
@@ -74,6 +74,14 @@ The loop is **fixed-timestep**: `fixedUpdate` runs at a constant 60 Hz (accumula
 ### Entity-component + resources (higher-level structure)
 
 Beyond the direct `GameObject`+`Mesh` approach, the engine has a small ECS: `Entity` (a `Transform` + a list of components + parent/children), `Component` (lifecycle `update(dt)`; subclass it for "scripts"), and `World` (holds entities, `update(dt)` recurses, `collect(Type)` gathers components). Built-in components: `MeshRenderer` (mesh + material) and `LightComponent` (copies its entity's world position into the light). `Entity.worldMatrix()` composes parent × local for scene graphs. `EcsScene` is the reference usage — a scene still owns the render loop (it `collect`s renderers/lights and draws them). `ResourceManager` caches textures/shaders/meshes by key (loads once) and disposes them all in its own `dispose()` — a scene that uses it disposes the manager instead of the individual assets.
+
+### Gameplay subsystems
+
+- **`InputMap`** — binds named actions to keys; query with `isDown(action, input)` / `isPressed(action, input)`. Keeps key codes out of scene logic.
+- **`CharacterController`** — first-person walk with gravity, jump, and ground-clamping. Physics is pure: ground height comes from a `Ground` functional interface (`Terrain::heightAt` in `WalkScene`), so it's unit-tested without GL.
+- **`Audio` + `Sound`** — OpenAL (`lwjgl-openal`). `Audio` opens the device/context (construct once, `destroy()` on teardown); `Sound` loads a 16-bit PCM WAV into a buffer/source and `play()`s it.
+- **`Hud`** — a 2D text overlay via stb_easy_font; quads are expanded to triangles for the core profile. `begin(w,h)` (framebuffer size) → `text(...)` → `end()`.
+- `WalkScene` integrates all of the above walking on the `Terrain`.
 
 ### Uniform-name conventions (contract between engine and shaders)
 

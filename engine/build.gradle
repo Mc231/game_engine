@@ -37,6 +37,7 @@ dependencies {
     api 'org.lwjgl:lwjgl-glfw'
     api 'org.lwjgl:lwjgl-opengl'
     api 'org.lwjgl:lwjgl-stb'
+    api 'org.lwjgl:lwjgl-openal'   // audio (OpenAL)
     api 'org.joml:joml:1.10.8'
 
     // Native binaries: needed only at runtime. As runtimeOnly on a library,
@@ -45,6 +46,7 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-stb::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-openal::$lwjglNatives"
 
     // Unit tests (pure logic only — GL-dependent classes are verified by running).
     testImplementation platform('org.junit:junit-bom:5.10.2')

@@ -6,6 +6,8 @@ import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_0;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_1;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_BRACKET;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_BRACKET;
 import static org.lwjgl.glfw.GLFW.glfwGetTime;
 import static org.lwjgl.opengl.GL11.*;
 
@@ -110,6 +112,13 @@ public class Engine {
             }
             if (scenes.size() >= 10 && window.input().isKeyPressed(GLFW_KEY_0)) {
                 activate(9, false);   // the 0 key selects the 10th scene
+            }
+            // [ and ] cycle through all scenes (works past the 10 number keys).
+            if (window.input().isKeyPressed(GLFW_KEY_RIGHT_BRACKET)) {
+                activate((current + 1) % scenes.size(), false);
+            }
+            if (window.input().isKeyPressed(GLFW_KEY_LEFT_BRACKET)) {
+                activate((current - 1 + scenes.size()) % scenes.size(), false);
             }
 
             Scene scene = scenes.get(current);
