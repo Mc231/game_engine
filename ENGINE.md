@@ -74,7 +74,7 @@ A lightweight 3D game engine in Java on top of **LWJGL 3** (OpenGL 3.3 core + GL
 `[`/`]` → `SerializedScene` — a level loaded from `levels/demo.json`
 `[`/`]` → `NormalMapScene` — normal mapping + transparency + shader hot-reload (`R`)
 `[`/`]` → `PhysicsScene` — raycast/AABB picking (crosshair highlights a cube)
-`[`/`]` → **`DrivingScene`** — drive a CC0 car around a curvy spline road on rolling terrain, under a cubemap sky, past an instanced forest 🏎️🌲
+`[`/`]` → **`DrivingScene`** — 🏎️ **time-trial game**: lap the curvy spline track on rolling terrain (sky + instanced forest); go off the road and you respawn at the start
 
 _(non-registered but present: `CubeScene`, `GameObjectScene`.)_
 

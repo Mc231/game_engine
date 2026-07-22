@@ -125,6 +125,17 @@ public class DrivingScene implements Scene {
     private float camYaw = 0f;
     private float camPitch = 0.42f;
 
+    // Time trial state.
+    private static final float OFF_TRACK = ROAD_WIDTH * 0.5f + 2.5f;   // dist from centerline before "crash"
+    private Vector3f[] centerline;
+    private final Vector3f startPos = new Vector3f();
+    private float startHeading;
+    private float lapTime = 0f;
+    private float bestLap = -1f;
+    private int laps = 0;
+    private boolean passedHalf = false;
+    private float crashFlash = 0f;
+
     @Override
     public void init(Window window) {
         this.window = window;
@@ -151,9 +162,10 @@ public class DrivingScene implements Scene {
         // Start the car on the track at waypoint 0, heading toward waypoint 1.
         Vector3f w0 = waypoints[0];
         Vector3f dir = new Vector3f(waypoints[1]).sub(w0);
-        controller = new CarController()
-                .setPosition(w0.x, 0f, w0.z)
-                .setHeading((float) Math.atan2(dir.x, dir.z));
+        startPos.set(w0.x, 0f, w0.z);
+        startHeading = (float) Math.atan2(dir.x, dir.z);
+        controller = new CarController().setPosition(startPos.x, startPos.y, startPos.z).setHeading(startHeading);
+        centerline = Road.centerline(waypoints, 24);   // for off-track + lap detection
 
         // Sky.
         skybox = new Skybox(new CubemapTexture(
@@ -196,6 +208,36 @@ public class DrivingScene implements Scene {
         boolean brake = actions.isDown("brake", input) || gamepad.button(GLFW_GAMEPAD_BUTTON_B);
 
         controller.update(deltaSeconds, clamp(throttle), clamp(steer), brake, terrain::heightAt);
+
+        // --- Time trial: nearest centerline point → off-track death + lap timing ---
+        lapTime += deltaSeconds;
+        if (crashFlash > 0f) crashFlash -= deltaSeconds;
+
+        Vector3f p = controller.position();
+        int nearest = 0;
+        float bestSq = Float.MAX_VALUE;
+        for (int i = 0; i < centerline.length; i++) {
+            float dx = p.x - centerline[i].x;
+            float dz = p.z - centerline[i].z;
+            float d = dx * dx + dz * dz;
+            if (d < bestSq) {
+                bestSq = d;
+                nearest = i;
+            }
+        }
+        if ((float) Math.sqrt(bestSq) > OFF_TRACK) {
+            crash();
+        } else {
+            int half = centerline.length / 2;
+            if (nearest > half) {
+                passedHalf = true;
+            } else if (passedHalf && nearest < centerline.length * 0.06f) {
+                laps++;
+                if (bestLap < 0f || lapTime < bestLap) bestLap = lapTime;
+                lapTime = 0f;
+                passedHalf = false;
+            }
+        }
 
         camYaw += input.mouseDeltaX() * 0.005f
                 + deadzone(gamepad.axis(GLFW_GAMEPAD_AXIS_RIGHT_X)) * deltaSeconds * 2.5f;
@@ -263,10 +305,17 @@ public class DrivingScene implements Scene {
         skybox.render(view, projection);
 
         // HUD.
+        int fbw = window.framebufferWidth();
         float kmh = Math.abs(controller.speed()) * 3.6f;
-        hud.begin(window.framebufferWidth(), window.framebufferHeight());
-        hud.text(12, 12, 2f, "DRIVE  -  W/S drive, A/D steer, Space brake, mouse camera, [ ] scene", 1f, 1f, 1f);
-        hud.text(12, 40, 3f, String.format("%3.0f km/h", kmh), 1f, 0.95f, 0.4f);
+        hud.begin(fbw, window.framebufferHeight());
+        hud.text(12, 12, 2f, "TIME TRIAL  -  stay on the road!   W/S drive, A/D steer, mouse cam, [ ] scene", 1f, 1f, 1f);
+        hud.text(12, 40, 3f, String.format("%6.2f s", lapTime), 1f, 0.95f, 0.4f);
+        hud.text(12, 74, 2f, (bestLap < 0f ? "best:   --" : String.format("best: %6.2f s", bestLap))
+                + "     lap " + laps, 0.6f, 1f, 0.7f);
+        hud.text(12, 100, 2f, String.format("%3.0f km/h", kmh), 0.9f, 0.9f, 1f);
+        if (crashFlash > 0f) {
+            hud.text(fbw / 2f - 150f, window.framebufferHeight() / 2f - 20f, 5f, "OFF TRACK!", 1f, 0.3f, 0.2f);
+        }
         hud.end();
     }
 
@@ -313,6 +362,23 @@ public class DrivingScene implements Scene {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /** Off the road: respawn at the start line and reset the lap timer. */
+    private void crash() {
+        controller = new CarController()
+                .setPosition(startPos.x, startPos.y, startPos.z)
+                .setHeading(startHeading);
+        lapTime = 0f;
+        passedHalf = false;
+        crashFlash = 1.4f;
+        camYaw = 0f;
+        // Snap the camera behind the start so it doesn't swoop across the map.
+        float a = startHeading + (float) Math.PI;
+        float cp = (float) Math.cos(camPitch);
+        float sp = (float) Math.sin(camPitch);
+        camPos.set(startPos).add(
+                (float) Math.sin(a) * cp * CAM_DISTANCE, sp * CAM_DISTANCE, (float) Math.cos(a) * cp * CAM_DISTANCE);
     }
 
     private static float clamp(float v) {

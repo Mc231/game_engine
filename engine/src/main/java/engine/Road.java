@@ -258,4 +258,35 @@ public final class Road {
 
         return new Mesh(vertices, new int[]{3, 3, 2}, indices);
     }
+
+    /**
+     * Samples the centerline of the same spline as {@link #spline} (identical
+     * order and count, {@code waypoints.length * segmentsPerSpan} points, y = 0).
+     * Useful for gameplay: nearest-point distance for off-track detection, and
+     * the point index as loop progress. Only x,z are meaningful.
+     */
+    public static org.joml.Vector3f[] centerline(org.joml.Vector3f[] waypoints, int segmentsPerSpan) {
+        int n = waypoints.length;
+        org.joml.Vector3f[] out = new org.joml.Vector3f[n * segmentsPerSpan];
+        int k = 0;
+        for (int i = 0; i < n; i++) {
+            org.joml.Vector3f p0 = waypoints[(i - 1 + n) % n];
+            org.joml.Vector3f p1 = waypoints[i];
+            org.joml.Vector3f p2 = waypoints[(i + 1) % n];
+            org.joml.Vector3f p3 = waypoints[(i + 2) % n];
+            for (int j = 0; j < segmentsPerSpan; j++) {
+                float t = (float) j / segmentsPerSpan;
+                float t2 = t * t;
+                float t3 = t2 * t;
+                float cx = 0.5f * (2f * p1.x + (-p0.x + p2.x) * t
+                        + (2f * p0.x - 5f * p1.x + 4f * p2.x - p3.x) * t2
+                        + (-p0.x + 3f * p1.x - 3f * p2.x + p3.x) * t3);
+                float cz = 0.5f * (2f * p1.z + (-p0.z + p2.z) * t
+                        + (2f * p0.z - 5f * p1.z + 4f * p2.z - p3.z) * t2
+                        + (-p0.z + 3f * p1.z - 3f * p2.z + p3.z) * t3);
+                out[k++] = new org.joml.Vector3f(cx, 0f, cz);
+            }
+        }
+        return out;
+    }
 }
