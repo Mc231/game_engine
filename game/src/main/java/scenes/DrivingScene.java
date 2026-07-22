@@ -77,6 +77,7 @@ public class DrivingScene implements Scene {
             out vec3 vColor;
             out vec3 vNormal;
             out vec3 vWorld;
+            out float vTint;
             uniform mat4 uView;
             uniform mat4 uProjection;
             void main() {
@@ -84,6 +85,9 @@ public class DrivingScene implements Scene {
                 vWorld = world.xyz;
                 vNormal = mat3(aInstance) * aNormal;
                 vColor = aColor;
+                // Per-tree brightness variation so the forest isn't uniform.
+                float s = fract(sin(float(gl_InstanceID + 1) * 12.9898) * 43758.5453);
+                vTint = 0.82 + 0.36 * s;
                 gl_Position = uProjection * uView * world;
             }
             """;
@@ -92,6 +96,7 @@ public class DrivingScene implements Scene {
             in vec3 vColor;
             in vec3 vNormal;
             in vec3 vWorld;
+            in float vTint;
             out vec4 FragColor;
             uniform vec3 uLightDir;
             uniform vec3 uViewPos;
@@ -100,7 +105,7 @@ public class DrivingScene implements Scene {
             void main() {
                 vec3 N = normalize(vNormal);
                 float diff = max(dot(N, normalize(-uLightDir)), 0.0);
-                vec3 color = vColor * (0.45 + 0.65 * diff);
+                vec3 color = vColor * vTint * (0.4 + 0.7 * diff);
                 float dist = length(uViewPos - vWorld);
                 float fog = 1.0 - exp(-dist * uFogDensity);
                 FragColor = vec4(mix(color, uFogColor, clamp(fog, 0.0, 1.0)), 1.0);
@@ -114,11 +119,14 @@ public class DrivingScene implements Scene {
     private Terrain terrain;
     private Texture grassTex;
     private Texture rockTex;
+    private Texture grassN;
+    private Texture rockN;
     private Mesh roadMesh;
     private Material roadMaterial;
     private Model car;
     private Skybox skybox;
-    private InstancedMesh forest;
+    private InstancedMesh oakForest;
+    private InstancedMesh pineForest;
     private CarController controller;
     private Input input;
     private InputMap actions;
@@ -161,6 +169,8 @@ public class DrivingScene implements Scene {
         treeShader = new ShaderProgram(TREE_VERTEX, TREE_FRAGMENT);
         grassTex = resources.texture("textures/grass.jpg");
         rockTex = resources.texture("textures/rock.jpg");
+        grassN = resources.texture("textures/grass_n.jpg");
+        rockN = resources.texture("textures/rock_n.jpg");
 
         terrain = new Terrain(320, 700f, 12f, 2025L);   // large, gentle green hills
 
@@ -191,13 +201,15 @@ public class DrivingScene implements Scene {
                 "skybox/right.png", "skybox/left.png", "skybox/top.png",
                 "skybox/bottom.png", "skybox/front.png", "skybox/back.png"));
 
-        // Instanced forest — off the track band, on the terrain.
-        Matrix4f[] trees = Scatter.onArea(500, 300f, 99L, 2.0f, 3.8f, terrain::heightAt,
-                (x, z) -> {
-                    float e = (float) Math.sqrt((x / RX) * (x / RX) + (z / RZ) * (z / RZ));
-                    return Math.abs(e - 1f) < 0.18f;   // keep trees off the road ring
-                });
-        forest = buildForest("models/tree/tree.obj", trees);
+        // Two instanced forests (oak + pine) — off the track band, on the terrain.
+        Scatter.Exclude offRoad = (x, z) -> {
+            float e = (float) Math.sqrt((x / RX) * (x / RX) + (z / RZ) * (z / RZ));
+            return Math.abs(e - 1f) < 0.18f;
+        };
+        oakForest = buildForest("models/tree/oak.obj",
+                Scatter.onArea(300, 300f, 99L, 2.0f, 3.4f, terrain::heightAt, offRoad));
+        pineForest = buildForest("models/tree/pine.obj",
+                Scatter.onArea(300, 300f, 41L, 2.6f, 4.6f, terrain::heightAt, offRoad));
 
         input = window.input();
         input.setMouseCaptured(true);
@@ -316,6 +328,10 @@ public class DrivingScene implements Scene {
         terrainShader.setUniform("uGrass", 0);
         rockTex.bind(1);
         terrainShader.setUniform("uRock", 1);
+        grassN.bind(2);
+        terrainShader.setUniform("uGrassN", 2);
+        rockN.bind(3);
+        terrainShader.setUniform("uRockN", 3);
         terrain.mesh().render();
 
         // Road + car (lit shader, one directional light).
@@ -341,7 +357,8 @@ public class DrivingScene implements Scene {
         treeShader.setUniform("uViewPos", camPos);
         treeShader.setUniform("uFogColor", sky);
         treeShader.setUniform("uFogDensity", FOG_DENSITY);
-        forest.render();
+        oakForest.render();
+        pineForest.render();
 
         // Sky fills the background.
         skybox.render(view, projection);
@@ -382,7 +399,8 @@ public class DrivingScene implements Scene {
             MtlLoader.MaterialDef def = part.materialName() != null ? mtl.get(part.materialName()) : null;
             float cr = def != null ? def.diffuse().x : 0.6f;
             float cg = def != null ? def.diffuse().y : 0.6f;
-            float cb = def != null ? def.diffuse().z : 0.6f;
+            // Kenney foliage is cyan-tinted; cut the blue for natural greens/browns.
+            float cb = (def != null ? def.diffuse().z : 0.6f) * 0.55f;
             float[] pv = part.mesh().vertices();   // stride 8: pos(3) normal(3) uv(2)
             int vcount = pv.length / 8;
             for (int v = 0; v < vcount; v++) {
@@ -445,7 +463,8 @@ public class DrivingScene implements Scene {
         roadMesh.dispose();
         car.dispose();
         skybox.dispose();
-        forest.dispose();
+        oakForest.dispose();
+        pineForest.dispose();
         terrainShader.dispose();
         treeShader.dispose();
         hud.dispose();

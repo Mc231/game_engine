@@ -10,6 +10,8 @@ uniform float uMaxHeight;
 uniform vec3 uFogColor;
 uniform sampler2D uGrass;
 uniform sampler2D uRock;
+uniform sampler2D uGrassN;
+uniform sampler2D uRockN;
 
 void main() {
     vec3 N = normalize(normal);
@@ -23,6 +25,16 @@ void main() {
     float t = clamp(height / uMaxHeight, 0.0, 1.0);
     float rockMix = clamp(smoothstep(0.30, 0.6, slope) + smoothstep(0.6, 0.95, t) * 0.6, 0.0, 1.0);
     vec3 base = mix(grass, rock, rockMix);
+
+    // --- Normal mapping: perturb the surface normal for lit detail ---
+    // UV maps to world XZ, so build a TBN whose tangent follows world +X.
+    vec3 nGrass = texture(uGrassN, uv).rgb * 2.0 - 1.0;
+    vec3 nRock  = texture(uRockN, uv * 0.5).rgb * 2.0 - 1.0;
+    vec3 nTex = normalize(mix(nGrass, nRock, rockMix));
+    vec3 T = normalize(vec3(1.0, 0.0, 0.0) - N * N.x);
+    vec3 B = cross(N, T);
+    vec3 Np = normalize(T * nTex.x + B * nTex.y + N * nTex.z);
+    N = normalize(mix(N, Np, 0.7));          // 0.7 = normal-map strength
 
     // Directional sun.
     vec3 lightDir = normalize(-uLightDir);

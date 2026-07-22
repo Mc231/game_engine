@@ -1,4 +1,3 @@
-Tree model: "tree_default" from the Nature Kit by Kenney (www.kenney.nl)
-Source:  https://kenney.nl/assets/nature-kit  (OpenGameArt: https://opengameart.org/content/nature-kit)
-License: CC0 1.0 (public domain). Attribution appreciated, not required.
-Colors come from material Kd (woodBark, leafsGreen); no texture.
+Tree models "tree_oak" and "tree_pineDefaultA" from the Nature Kit by Kenney
+(www.kenney.nl). Source: https://opengameart.org/content/nature-kit  License: CC0 1.0.
+Colors from material Kd (no texture). mtllib renamed to oak.mtl / pine.mtl.
