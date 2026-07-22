@@ -1,0 +1,5 @@
+Car model: "sedan-sports" from the Car Kit by Kenney (www.kenney.nl)
+Source:  https://kenney.nl/assets/car-kit  (also OpenGameArt: https://opengameart.org/content/car-kit)
+License: CC0 1.0 (public domain). Attribution appreciated but not required.
+
+Files: car.obj, car.mtl, Textures/colormap.png (unmodified except mtllib rename).

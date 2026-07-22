@@ -104,6 +104,10 @@ Beyond the direct `GameObject`+`Mesh` approach, the engine has a small ECS: `Ent
 - **`AABB` / `Ray` / `Intersect`** — pure collision math (ray-AABB slab test, AABB overlap, ray-plane); `PhysicsScene` raycasts from the camera to pick cubes.
 - **Normal mapping** — `Geometry.cubeWithTangents()` (layout `{3,3,2,3}`) + `shaders/normalmap.*` (TBN, tangent-space normals). **Transparency** — alpha blend with `glDepthMask(false)` and back-to-front sorting (see `NormalMapScene`).
 
+### The driving game (`DrivingScene`)
+
+`DrivingScene` is a small game built on the engine: **`CarController`** (arcade driving physics — throttle/steer/brake, ground-clamped to a height field; pure + unit-tested, `forward = (sin h, 0, cos h)`, heading 0 → +Z) + **`Road`** (a terrain-conforming closed-loop ribbon `Mesh`, `Road.loop(...)`) + a chase camera that smoothly follows the car. The car is a **third-party CC0 model** (Kenney "Car Kit") at `game/src/main/resources/models/car/` (`car.obj` + `colormap.png`, see `CREDITS.txt`) — it loads through the existing `Model`/`MtlLoader` (standard `v/vt/vn` OBJ + `map_Kd` texture; the extra per-vertex color floats on `v` lines are ignored). Note `MODEL_YAW_OFFSET` in the scene flips the model 180° if a downloaded car faces the other way. New game assets/models go under `game/src/main/resources/`; keep third-party assets CC0/permissive and record provenance in a `CREDITS.txt`.
+
 ### Uniform-name conventions (contract between engine and shaders)
 
 Engine classes set uniforms by fixed names that shaders must declare:

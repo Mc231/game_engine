@@ -1,6 +1,7 @@
 import engine.Application;
 import engine.Settings;
 import scenes.CameraCubeScene;
+import scenes.DrivingScene;
 import scenes.EcsScene;
 import scenes.LightsScene;
 import scenes.LitCubeScene;
@@ -45,6 +46,7 @@ public class Main {
                 .scene(new SerializedScene())      // 13th ([ / ] to reach)
                 .scene(new NormalMapScene())       // 14th ([ / ] to reach)
                 .scene(new PhysicsScene())         // 15th ([ / ] to reach)
+                .scene(new DrivingScene())         // 16th ([ / ] to reach) — the driving game
                 .run();
     }
 }
