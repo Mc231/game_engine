@@ -16,6 +16,7 @@ import scenes.TerrainScene;
 import scenes.TexturedCubeScene;
 import scenes.TriangleScene;
 import scenes.WalkScene;
+import scenes.city.GtaScene;
 import scenes.prison.PrisonScene;
 
 /**
@@ -49,6 +50,7 @@ public class Main {
                 .scene(new PhysicsScene())         // 15th ([ / ] to reach)
                 .scene(new DrivingScene())         // 16th ([ / ] to reach) — the driving game
                 .scene(new PrisonScene())          // 17th ([ / ] to reach) — Prison Break (stealth)
+                .scene(new GtaScene())             // 18th ([ / ] to reach) — Grand Theft LWJGL (Phase 0)
                 .run();
     }
 }
