@@ -1,4 +1,4 @@
-package scenes.city;
+package scenes.gta;
 
 import engine.AABB;
 import engine.Collide;

@@ -1,9 +1,10 @@
-package scenes.city;
+package scenes.gta;
 
+import engine.AABB;
 import engine.CarController;
+import engine.Collide;
 import engine.Disposable;
 import engine.Model;
-import engine.ShaderProgram;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
@@ -36,9 +37,17 @@ public class Vehicle implements Disposable {
         controller.setPosition(startX, 0f, startZ).setHeading(headingRad);
     }
 
+    /** Body radius used for arcade collision against buildings. */
+    private static final float BODY_RADIUS = 1.5f;
+
     /** Advance the driving simulation (inputs already resolved to -1..1 / brake). */
     public void update(float dt, float throttle, float steer, boolean brake) {
         controller.update(dt, throttle, steer, brake, FLAT);
+    }
+
+    /** Push the car out of any overlapping building colliders (call after {@link #update}). */
+    public void collide(AABB[] walls) {
+        Collide.resolveCircle(controller.position(), BODY_RADIUS, walls);
     }
 
     /** True if a character at {@code p} is close enough to get in. */

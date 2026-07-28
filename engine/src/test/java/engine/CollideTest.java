@@ -39,4 +39,32 @@ class CollideTest {
         assertEquals(1f, pos.x, EPS);
         assertEquals(1f, pos.z, EPS);
     }
+
+    @Test
+    void resolveCirclePushesOutToExactContact() {
+        // Circle radius 1 overlapping the wall's left face (wall x in [4,6]).
+        Vector3f pos = new Vector3f(4.5f, 0f, 0f);   // 0.5 inside the x=4 face
+        boolean moved = Collide.resolveCircle(pos, 1f, wall());
+        assertEquals(true, moved);
+        assertEquals(3f, pos.x, EPS);   // pushed to x=4 - radius(1) = 3
+        assertEquals(0f, pos.z, EPS);   // tangential axis unchanged
+    }
+
+    @Test
+    void resolveCircleNoOverlapLeavesPositionUntouched() {
+        Vector3f pos = new Vector3f(0f, 0f, 0f);     // far from the wall at x∈[4,6]
+        boolean moved = Collide.resolveCircle(pos, 1f, wall());
+        assertEquals(false, moved);
+        assertEquals(0f, pos.x, EPS);
+        assertEquals(0f, pos.z, EPS);
+    }
+
+    @Test
+    void resolveCircleEjectsCenterInsideBox() {
+        // Center inside the wall, nearer the +x face → ejected out the +x side.
+        Vector3f pos = new Vector3f(5.5f, 0f, 0f);
+        Collide.resolveCircle(pos, 0.5f, wall());
+        assertEquals(6.5f, pos.x, EPS);   // max.x(6) + radius(0.5)
+        assertEquals(0f, pos.z, EPS);
+    }
 }

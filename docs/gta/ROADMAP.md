@@ -10,7 +10,7 @@ code as it actually exists. Phases are ordered so the game is fun and runnable a
 |------:|------|--------|-----------|--------|
 | 0 | Third-person on-foot | (foundation) | v0.1 | ✅ done |
 | 1 | Vehicle entry + driving | Driving | **v0.1** | ✅ done — **v0.1 shipped** |
-| 2 | Procedural city | Open city | v0.2 | 📝 spec written |
+| 2 | Procedural city | Open city | v0.2 | 🔨 built (2a–2c) — playtest |
 | 3 | Street life (peds + traffic) | Open city + life | **v0.2** | ⬜ |
 | 4 | Combat & weapons | Combat | v0.3 | ⬜ |
 | 5 | Wanted level & police | Combat/police | **v0.3** | ⬜ |

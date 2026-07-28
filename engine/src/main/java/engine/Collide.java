@@ -37,6 +37,58 @@ public final class Collide {
         }
     }
 
+    /**
+     * Pushes a circle of {@code radius} centered at {@code pos} (XZ plane) out of
+     * any overlapping {@code walls}, resolving penetration so the mover ends up
+     * just touching each wall's edge. Y is ignored (walls are treated as infinite
+     * vertical prisms). Unlike {@link #slideXZ} this is displacement-based, so it
+     * works for a mover whose motion was already integrated elsewhere (e.g. a
+     * {@link CarController}); tangential motion is preserved (it slides).
+     *
+     * @return true if any correction was applied.
+     */
+    public static boolean resolveCircle(Vector3f pos, float radius, AABB[] walls) {
+        if (walls == null || walls.length == 0) {
+            return false;
+        }
+        boolean moved = false;
+        for (AABB wall : walls) {
+            float closestX = clamp(pos.x, wall.min.x, wall.max.x);
+            float closestZ = clamp(pos.z, wall.min.z, wall.max.z);
+            float dx = pos.x - closestX;
+            float dz = pos.z - closestZ;
+            float d2 = dx * dx + dz * dz;
+
+            if (d2 > 1e-8f) {
+                // Center is outside the box: push out along the nearest-point normal.
+                if (d2 < radius * radius) {
+                    float d = (float) Math.sqrt(d2);
+                    float push = radius - d;
+                    pos.x += dx / d * push;
+                    pos.z += dz / d * push;
+                    moved = true;
+                }
+            } else {
+                // Center is inside the box: eject along the axis of least penetration.
+                float toMinX = pos.x - wall.min.x, toMaxX = wall.max.x - pos.x;
+                float toMinZ = pos.z - wall.min.z, toMaxZ = wall.max.z - pos.z;
+                float penX = Math.min(toMinX, toMaxX);
+                float penZ = Math.min(toMinZ, toMaxZ);
+                if (penX < penZ) {
+                    pos.x += (toMinX < toMaxX ? -(penX + radius) : (penX + radius));
+                } else {
+                    pos.z += (toMinZ < toMaxZ ? -(penZ + radius) : (penZ + radius));
+                }
+                moved = true;
+            }
+        }
+        return moved;
+    }
+
+    private static float clamp(float v, float lo, float hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
+    }
+
     /** True if the mover body at {@code pos} intersects any wall in {@code walls}. */
     private static boolean hitsAny(Vector3f pos, float radius, AABB[] walls) {
         AABB body = new AABB(

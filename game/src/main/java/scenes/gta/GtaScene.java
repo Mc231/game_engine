@@ -1,13 +1,11 @@
-package scenes.city;
+package scenes.gta;
 
 import engine.AABB;
-import engine.Geometry;
 import engine.Hud;
 import engine.Input;
 import engine.InputMap;
 import engine.Light;
 import engine.Material;
-import engine.Mesh;
 import engine.Model;
 import engine.OrbitCamera;
 import engine.ResourceManager;
@@ -18,21 +16,20 @@ import engine.Window;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 
 /**
- * Grand Theft LWJGL (codename MiniCity) — Phase 0: third-person on-foot.
+ * Grand Theft LWJGL (codename MiniCity) — the game scene, and the growth point
+ * for every phase.
  *
- * <p>Control a low-poly {@link Avatar} in third person around a small walled test
- * block: mouse orbits the {@link OrbitCamera}, WASD moves camera-relative, Shift
- * runs, and the camera pulls in so it never clips a wall. This scene is the
- * growth point for every later phase (vehicles, city, peds, combat...).
+ * <p>Phase 0/1: third-person on-foot {@link Avatar} + enter/drive/exit a
+ * {@link Vehicle}. Phase 2: a procedural {@link City} of streets, sidewalks, and
+ * instanced buildings you collide with (broad-phase via the city's spatial grid;
+ * arcade car push-out via {@code Collide.resolveCircle}).
  *
- *   Move: W/A/S/D   Run: Shift   Look: mouse
+ *   On foot: W/A/S/D move · Shift run · mouse look · F enter car
+ *   Driving: W/S drive · A/D steer · Space brake · mouse orbit · F exit
  */
 public class GtaScene implements Scene {
 
@@ -41,21 +38,20 @@ public class GtaScene implements Scene {
     // Camera profiles per mode.
     private static final float FOOT_DISTANCE = 6.5f, FOOT_HEIGHT = 1.4f;
     private static final float CAR_DISTANCE = 10f, CAR_HEIGHT = 1.2f;
+    // How far around a mover we query building colliders each frame.
+    private static final float NEAR_RADIUS = 26f;
 
     private final ResourceManager resources = new ResourceManager();
-    private ShaderProgram litShader;
-    private Mesh cubeMesh;
-    private Mesh floorMesh;
-    private Material floorMat;
-    private Material wallMat;
-    private Material curbMat;
+    private ShaderProgram litShader;    // ground, car, avatar (Phong, textured)
+    private ShaderProgram cityShader;   // instanced sidewalks + buildings (biplanar, directional)
+    private Material asphaltMat;
+    private Texture concreteTex;
+    private Texture facadeTex;
+
+    private City city;
     private Avatar avatar;
     private Vehicle car;
     private Mode mode = Mode.ON_FOOT;
-
-    private final List<Matrix4f> wallModels = new ArrayList<>();
-    private final List<AABB> wallBoxes = new ArrayList<>();
-    private AABB[] walls;
 
     private ThirdPersonController player;
     private OrbitCamera camera;
@@ -65,37 +61,35 @@ public class GtaScene implements Scene {
     private Window window;
 
     private final Light[] lights = new Light[2];
+    private final Vector3f lightDir = new Vector3f(-0.4f, -1f, -0.3f).normalize();
+    private final Vector3f lightColor = new Vector3f(1f, 0.97f, 0.9f);
     private final Matrix4f projection = new Matrix4f();
-    private final Matrix4f model = new Matrix4f();
-    private final Matrix4f floorModel = new Matrix4f();
+    private final Matrix4f identity = new Matrix4f();
     private final Vector3f tmp = new Vector3f();
 
     @Override
     public void init(Window window) {
         this.window = window;
         litShader = resources.shader("shaders/lit.vert", "shaders/lit.frag");
-        cubeMesh = new Mesh(Geometry.cubeWithNormalsAndUV(), new int[]{3, 3, 2});
-        floorMesh = new Mesh(Geometry.plane(40f, 40f), new int[]{3, 3, 2});
+        cityShader = resources.shader("shaders/city.vert", "shaders/city.frag");
 
-        Texture floorTex = resources.texture("textures/floor.jpg");
+        Texture asphaltTex = resources.texture("textures/road.png");
+        concreteTex = resources.texture("textures/wall.jpg");
+        facadeTex = resources.texture("textures/facade.png");
         Texture white = resources.texture("textures/white.png");
-        floorMat = new Material(litShader, floorTex).setTint(0.7f, 0.72f, 0.72f).setAmbientStrength(0.35f);
-        wallMat = new Material(litShader, white).setTint(0.55f, 0.57f, 0.62f).setAmbientStrength(0.35f);
-        curbMat = new Material(litShader, white).setTint(0.75f, 0.72f, 0.4f).setAmbientStrength(0.4f);
+        asphaltMat = new Material(litShader, asphaltTex).setTint(0.5f, 0.5f, 0.52f).setAmbientStrength(0.4f);
+
+        city = CityGenerator.generate(new CityGenerator.Config());
 
         avatar = new Avatar(litShader, white, Avatar.civilian());
-
         Model carModel = Model.load("models/car/car.obj", litShader, resources);
-        car = new Vehicle(carModel, 6f, -8f, 0f, 3.6f, new Vector3f(-1.9f, 0f, 0f));
+        car = new Vehicle(carModel, city.carSpawn.x, city.carSpawn.z, city.carHeading, 3.6f, new Vector3f(-1.9f, 0f, 0f));
 
-        buildTestBlock();
-        walls = wallBoxes.toArray(new AABB[0]);
+        lights[0] = Light.directional(lightDir, new Vector3f(0.9f, 0.88f, 0.82f));
+        lights[1] = Light.point(new Vector3f(0f, 20f, 0f), new Vector3f(0.35f, 0.37f, 0.45f));
 
-        lights[0] = Light.directional(new Vector3f(-0.4f, -1f, -0.3f), new Vector3f(0.9f, 0.88f, 0.82f));
-        lights[1] = Light.point(new Vector3f(0f, 8f, 0f), new Vector3f(0.4f, 0.42f, 0.5f));
-
-        player = new ThirdPersonController(0f, 0f, 0f);
-        camera = new OrbitCamera().setDistance(6.5f).setPitch(0.5f).setTargetHeight(1.4f);
+        player = new ThirdPersonController(city.playerSpawn.x, city.playerSpawn.z, 0f);
+        camera = new OrbitCamera().setPitch(0.5f).setDistance(FOOT_DISTANCE).setTargetHeight(FOOT_HEIGHT);
 
         input = window.input();
         input.setMouseCaptured(true);
@@ -108,27 +102,7 @@ public class GtaScene implements Scene {
                 .bind("brake", GLFW_KEY_SPACE);
         hud = new Hud();
 
-        camera.setDistance(FOOT_DISTANCE).setTargetHeight(FOOT_HEIGHT);
-
-        projection.identity().perspective((float) Math.toRadians(65.0), window.aspectRatio(), 0.1f, 400f);
-    }
-
-    /** A flat courtyard: perimeter walls plus a few interior blocks to test camera pull-in. */
-    private void buildTestBlock() {
-        float H = 4f, half = 20f, t = 0.6f;
-        addWall(0f, H / 2f, -half, half * 2f, H, t);   // north
-        addWall(0f, H / 2f, half, half * 2f, H, t);    // south
-        addWall(-half, H / 2f, 0f, t, H, half * 2f);   // west
-        addWall(half, H / 2f, 0f, t, H, half * 2f);    // east
-        // Interior obstacles (also good for camera collision + wall slide).
-        addWall(-8f, 1.5f, -6f, 4f, 3f, 4f);
-        addWall(9f, 1.5f, 7f, 5f, 3f, 3f);
-        addWall(3f, 1f, 12f, 3f, 2f, 3f);
-    }
-
-    private void addWall(float cx, float cy, float cz, float sx, float sy, float sz) {
-        wallModels.add(new Matrix4f().translate(cx, cy, cz).scale(sx, sy, sz));
-        wallBoxes.add(AABB.fromCenterSize(new Vector3f(cx, cy, cz), new Vector3f(sx, sy, sz)));
+        projection.identity().perspective((float) Math.toRadians(65.0), window.aspectRatio(), 0.1f, 600f);
     }
 
     @Override
@@ -136,29 +110,31 @@ public class GtaScene implements Scene {
         camera.addLook(input.mouseDeltaX(), input.mouseDeltaY());
 
         if (mode == Mode.ON_FOOT) {
+            AABB[] near = city.wallsNear(player.position(), NEAR_RADIUS);
             float forward = (actions.isDown("forward", input) ? 1f : 0f) - (actions.isDown("back", input) ? 1f : 0f);
             float strafe = (actions.isDown("right", input) ? 1f : 0f) - (actions.isDown("left", input) ? 1f : 0f);
             boolean run = actions.isDown("run", input);
-            player.update(deltaSeconds, forward, strafe, run, camera, walls);
+            player.update(deltaSeconds, forward, strafe, run, camera, near);
             avatar.animate(player.speed(), deltaSeconds);
 
             if (input.isKeyPressed(GLFW_KEY_F) && car.nearSeat(player.position())) {
                 enterCar();
             }
             camera.setBaseYaw(0f);
-            camera.update(player.position(), deltaSeconds, walls);
+            camera.update(player.position(), deltaSeconds, near);
         } else { // DRIVING
-            // throttle = W - S ; steer = A - D (matches DrivingScene) ; Space = brake.
+            AABB[] near = city.wallsNear(car.position(), NEAR_RADIUS);
             float throttle = (actions.isDown("forward", input) ? 1f : 0f) - (actions.isDown("back", input) ? 1f : 0f);
             float steer = (actions.isDown("left", input) ? 1f : 0f) - (actions.isDown("right", input) ? 1f : 0f);
             boolean brake = actions.isDown("brake", input);
             car.update(deltaSeconds, throttle, steer, brake);
+            car.collide(near);
 
             if (input.isKeyPressed(GLFW_KEY_F)) {
                 exitCar();
             }
             camera.setBaseYaw(car.heading() + (float) Math.PI);
-            camera.update(car.position(), deltaSeconds, walls);
+            camera.update(car.position(), deltaSeconds, near);
         }
     }
 
@@ -178,15 +154,16 @@ public class GtaScene implements Scene {
     @Override
     public void resize(int width, int height) {
         if (height == 0) return;
-        projection.identity().perspective((float) Math.toRadians(65.0), (float) width / height, 0.1f, 400f);
+        projection.identity().perspective((float) Math.toRadians(65.0), (float) width / height, 0.1f, 600f);
     }
 
     @Override
     public void render() {
-        glClearColor(0.5f, 0.62f, 0.75f, 1f);
+        glClearColor(0.55f, 0.66f, 0.78f, 1f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         Matrix4f view = camera.viewMatrix();
 
+        // --- Ground, car, avatar (lit/Phong shader) ---
         litShader.bind();
         litShader.setUniform("uProjection", projection);
         litShader.setUniform("uView", view);
@@ -195,21 +172,35 @@ public class GtaScene implements Scene {
         litShader.setUniform("uLightCount", lights.length);
         for (int i = 0; i < lights.length; i++) lights[i].apply(litShader, "uLights[" + i + "]");
 
-        floorMat.use();
-        litShader.setUniform("uModel", floorModel.identity());
-        floorMesh.render();
+        asphaltMat.use();
+        litShader.setUniform("uModel", identity);
+        city.ground.render();
 
-        wallMat.use();
-        for (Matrix4f m : wallModels) {
-            litShader.setUniform("uModel", m);
-            cubeMesh.render();
-        }
-
-        // The car is always in the world; the avatar only shows when on foot.
         litShader.setUniform("uModel", car.matrix());
         car.render();
         if (mode == Mode.ON_FOOT) {
             avatar.render(player.position(), player.facing());
+        }
+
+        // --- Sidewalks + buildings (instanced biplanar shader) ---
+        cityShader.bind();
+        cityShader.setUniform("uProjection", projection);
+        cityShader.setUniform("uView", view);
+        cityShader.setUniform("uLightDir", lightDir);
+        cityShader.setUniform("uLightColor", lightColor);
+        cityShader.setUniform("uAmbient", 0.45f);
+        cityShader.setUniform("uTexture", 0);
+
+        concreteTex.bind(0);
+        cityShader.setUniform("uTexScale", 0.18f);
+        cityShader.setUniform("uTint", tmp.set(0.82f, 0.82f, 0.84f));
+        city.sidewalks.render();
+
+        facadeTex.bind(0);
+        cityShader.setUniform("uTexScale", 0.11f);
+        for (int i = 0; i < city.buildingBatches.length; i++) {
+            cityShader.setUniform("uTint", city.buildingTints[i]);
+            city.buildingBatches[i].render();
         }
 
         renderHud();
@@ -219,7 +210,7 @@ public class GtaScene implements Scene {
         int fbw = window.framebufferWidth();
         int fbh = window.framebufferHeight();
         hud.begin(fbw, fbh);
-        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 1", 1f, 1f, 1f);
+        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 2 (city)", 1f, 1f, 1f);
         if (mode == Mode.ON_FOOT) {
             hud.text(12, 40, 2f, "ON FOOT   speed " + String.format("%.1f", player.speed()), 0.8f, 0.9f, 1f);
             String hint = car.nearSeat(player.position())
@@ -234,8 +225,7 @@ public class GtaScene implements Scene {
 
     @Override
     public void dispose() {
-        cubeMesh.dispose();
-        floorMesh.dispose();
+        city.dispose();
         avatar.dispose();
         car.dispose();
         hud.dispose();

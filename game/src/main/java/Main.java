@@ -16,7 +16,7 @@ import scenes.TerrainScene;
 import scenes.TexturedCubeScene;
 import scenes.TriangleScene;
 import scenes.WalkScene;
-import scenes.city.GtaScene;
+import scenes.gta.GtaScene;
 import scenes.prison.PrisonScene;
 
 /**

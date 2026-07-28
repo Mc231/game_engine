@@ -1,6 +1,13 @@
 # Phase 2 — Procedural city  → **v0.2** (part 1)
 
-**Milestone:** starts v0.2 · **Status:** 📝 spec written · **Pillar:** Open city
+**Milestone:** starts v0.2 · **Status:** 🔨 built (2a–2c) — awaiting playtest · **Pillar:** Open city
+
+> **Built:** `engine.SpatialGrid` (broad-phase, unit-tested) + `engine.Collide.resolveCircle`
+> (car push-out, unit-tested); `scenes.gta.CityGenerator` → `City` (grid streets, instanced
+> sidewalks + tint-batched box buildings, one collider each); instanced biplanar `shaders/city.*`;
+> `GtaScene` now builds/renders the city with per-entity grid collider queries. All GTA game code
+> moved to package **`scenes.gta`**. Compiles, tests green, launches (exit 124). **2d (street props)
+> not yet done.** Feel/perf pending playtest.
 
 Replace the flat test lot with a real **drivable, walkable city**: a grid of streets and
 sidewalks lined with low-poly buildings you collide with. This is the biggest content system in

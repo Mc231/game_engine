@@ -1,6 +1,7 @@
 package engine;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -65,9 +66,7 @@ public final class Application {
     }
 
     public Application scenes(Scene... toAdd) {
-        for (Scene s : toAdd) {
-            scenes.add(s);
-        }
+        Collections.addAll(scenes, toAdd);
         return this;
     }
 
