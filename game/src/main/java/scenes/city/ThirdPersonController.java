@@ -32,6 +32,13 @@ public class ThirdPersonController {
         this.facing = facing;
     }
 
+    /** Teleport the character (e.g. stepping out of a car). Clears residual speed. */
+    public void place(float x, float z, float facing) {
+        position.set(x, 0f, z);
+        this.facing = facing;
+        this.speed = 0f;
+    }
+
     /**
      * @param forwardIn -1..1 (W positive)
      * @param strafeIn  -1..1 (D positive)

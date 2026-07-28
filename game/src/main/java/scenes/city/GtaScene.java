@@ -8,6 +8,7 @@ import engine.InputMap;
 import engine.Light;
 import engine.Material;
 import engine.Mesh;
+import engine.Model;
 import engine.OrbitCamera;
 import engine.ResourceManager;
 import engine.Scene;
@@ -35,6 +36,12 @@ import static org.lwjgl.opengl.GL11.*;
  */
 public class GtaScene implements Scene {
 
+    private enum Mode { ON_FOOT, DRIVING }
+
+    // Camera profiles per mode.
+    private static final float FOOT_DISTANCE = 6.5f, FOOT_HEIGHT = 1.4f;
+    private static final float CAR_DISTANCE = 10f, CAR_HEIGHT = 1.2f;
+
     private final ResourceManager resources = new ResourceManager();
     private ShaderProgram litShader;
     private Mesh cubeMesh;
@@ -43,6 +50,8 @@ public class GtaScene implements Scene {
     private Material wallMat;
     private Material curbMat;
     private Avatar avatar;
+    private Vehicle car;
+    private Mode mode = Mode.ON_FOOT;
 
     private final List<Matrix4f> wallModels = new ArrayList<>();
     private final List<AABB> wallBoxes = new ArrayList<>();
@@ -76,6 +85,9 @@ public class GtaScene implements Scene {
 
         avatar = new Avatar(litShader, white, Avatar.civilian());
 
+        Model carModel = Model.load("models/car/car.obj", litShader, resources);
+        car = new Vehicle(carModel, 6f, -8f, 0f, 3.6f, new Vector3f(-1.9f, 0f, 0f));
+
         buildTestBlock();
         walls = wallBoxes.toArray(new AABB[0]);
 
@@ -92,8 +104,11 @@ public class GtaScene implements Scene {
                 .bind("back", GLFW_KEY_S, GLFW_KEY_DOWN)
                 .bind("left", GLFW_KEY_A, GLFW_KEY_LEFT)
                 .bind("right", GLFW_KEY_D, GLFW_KEY_RIGHT)
-                .bind("run", GLFW_KEY_LEFT_SHIFT, GLFW_KEY_RIGHT_SHIFT);
+                .bind("run", GLFW_KEY_LEFT_SHIFT, GLFW_KEY_RIGHT_SHIFT)
+                .bind("brake", GLFW_KEY_SPACE);
         hud = new Hud();
+
+        camera.setDistance(FOOT_DISTANCE).setTargetHeight(FOOT_HEIGHT);
 
         projection.identity().perspective((float) Math.toRadians(65.0), window.aspectRatio(), 0.1f, 400f);
     }
@@ -119,12 +134,45 @@ public class GtaScene implements Scene {
     @Override
     public void update(float deltaSeconds) {
         camera.addLook(input.mouseDeltaX(), input.mouseDeltaY());
-        float forward = (actions.isDown("forward", input) ? 1f : 0f) - (actions.isDown("back", input) ? 1f : 0f);
-        float strafe = (actions.isDown("right", input) ? 1f : 0f) - (actions.isDown("left", input) ? 1f : 0f);
-        boolean run = actions.isDown("run", input);
-        player.update(deltaSeconds, forward, strafe, run, camera, walls);
-        avatar.animate(player.speed(), deltaSeconds);
-        camera.update(player.position(), deltaSeconds, walls);
+
+        if (mode == Mode.ON_FOOT) {
+            float forward = (actions.isDown("forward", input) ? 1f : 0f) - (actions.isDown("back", input) ? 1f : 0f);
+            float strafe = (actions.isDown("right", input) ? 1f : 0f) - (actions.isDown("left", input) ? 1f : 0f);
+            boolean run = actions.isDown("run", input);
+            player.update(deltaSeconds, forward, strafe, run, camera, walls);
+            avatar.animate(player.speed(), deltaSeconds);
+
+            if (input.isKeyPressed(GLFW_KEY_F) && car.nearSeat(player.position())) {
+                enterCar();
+            }
+            camera.setBaseYaw(0f);
+            camera.update(player.position(), deltaSeconds, walls);
+        } else { // DRIVING
+            // throttle = W - S ; steer = A - D (matches DrivingScene) ; Space = brake.
+            float throttle = (actions.isDown("forward", input) ? 1f : 0f) - (actions.isDown("back", input) ? 1f : 0f);
+            float steer = (actions.isDown("left", input) ? 1f : 0f) - (actions.isDown("right", input) ? 1f : 0f);
+            boolean brake = actions.isDown("brake", input);
+            car.update(deltaSeconds, throttle, steer, brake);
+
+            if (input.isKeyPressed(GLFW_KEY_F)) {
+                exitCar();
+            }
+            camera.setBaseYaw(car.heading() + (float) Math.PI);
+            camera.update(car.position(), deltaSeconds, walls);
+        }
+    }
+
+    private void enterCar() {
+        mode = Mode.DRIVING;
+        camera.setDistance(CAR_DISTANCE).setTargetHeight(CAR_HEIGHT).resetYaw();
+    }
+
+    private void exitCar() {
+        mode = Mode.ON_FOOT;
+        car.worldExit(tmp);
+        player.place(tmp.x, tmp.z, car.heading() + (float) (Math.PI / 2.0));   // face away from the door
+        avatar.animate(0f, 0f);
+        camera.setDistance(FOOT_DISTANCE).setTargetHeight(FOOT_HEIGHT).resetYaw();
     }
 
     @Override
@@ -157,7 +205,12 @@ public class GtaScene implements Scene {
             cubeMesh.render();
         }
 
-        avatar.render(player.position(), player.facing());
+        // The car is always in the world; the avatar only shows when on foot.
+        litShader.setUniform("uModel", car.matrix());
+        car.render();
+        if (mode == Mode.ON_FOOT) {
+            avatar.render(player.position(), player.facing());
+        }
 
         renderHud();
     }
@@ -166,9 +219,16 @@ public class GtaScene implements Scene {
         int fbw = window.framebufferWidth();
         int fbh = window.framebufferHeight();
         hud.begin(fbw, fbh);
-        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 0", 1f, 1f, 1f);
-        hud.text(12, 40, 2f, "ON FOOT   speed " + String.format("%.1f", player.speed()), 0.8f, 0.9f, 1f);
-        hud.text(12, 64, 1.7f, "WASD move   Shift run   mouse look", 0.75f, 0.8f, 0.85f);
+        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 1", 1f, 1f, 1f);
+        if (mode == Mode.ON_FOOT) {
+            hud.text(12, 40, 2f, "ON FOOT   speed " + String.format("%.1f", player.speed()), 0.8f, 0.9f, 1f);
+            String hint = car.nearSeat(player.position())
+                    ? "[F] enter car    WASD move   Shift run" : "WASD move   Shift run   mouse look";
+            hud.text(12, 64, 1.7f, hint, 0.75f, 0.85f, 0.9f);
+        } else {
+            hud.text(12, 40, 2f, "DRIVING   " + String.format("%.0f", Math.abs(car.speed()) * 3.6f) + " km/h", 1f, 0.9f, 0.7f);
+            hud.text(12, 64, 1.7f, "[F] exit    W/S drive   A/D steer   Space brake", 0.85f, 0.85f, 0.8f);
+        }
         hud.end();
     }
 
@@ -177,6 +237,7 @@ public class GtaScene implements Scene {
         cubeMesh.dispose();
         floorMesh.dispose();
         avatar.dispose();
+        car.dispose();
         hud.dispose();
         resources.dispose();
     }

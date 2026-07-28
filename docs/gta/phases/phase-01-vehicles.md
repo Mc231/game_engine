@@ -1,6 +1,11 @@
 # Phase 1 — Vehicle entry + driving  → **v0.1**
 
-**Milestone:** completes **v0.1** (traversal slice) · **Status:** 📝 spec written · **Pillar:** Driving
+**Milestone:** completes **v0.1** (traversal slice) · **Status:** 🔨 built — awaiting playtest · **Pillar:** Driving
+
+> **Built:** `scenes.city.Vehicle` (Model + CarController + seat/exit/proximity),
+> `Mode` state machine in `GtaScene` (ON_FOOT ↔ DRIVING, F to toggle), per-mode camera profiles,
+> and an `OrbitCamera.setBaseYaw` addition so the chase cam trails the car's heading. Reuses the
+> CC0 Kenney car. Compiles, tests green, launches (exit 124). **v0.1 functionally complete** — feel-tuning pending playtest.
 
 The payoff phase. On top of Phase 0's on-foot scene, drop a **parked car** you can walk
 up to, **get in**, **drive**, and **get out of**. This is the on-foot ↔ vehicle core that *is*

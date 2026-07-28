@@ -26,6 +26,7 @@ public class OrbitCamera {
 
     // Orbit state.
     private float yaw = 0f;            // radians; 0 = camera behind target's -Z
+    private float baseYaw = 0f;        // added to yaw so the cam can trail a heading (e.g. a car)
     private float pitch = 0.5f;        // radians above the horizon
     private float distance = 6f;
 
@@ -61,10 +62,11 @@ public class OrbitCamera {
     public void update(Vector3f target, float dt, AABB[] walls) {
         lookAt.set(target.x, target.y + targetHeight, target.z);
 
+        float a = yaw + baseYaw;
         float cp = (float) Math.cos(pitch);
         float sp = (float) Math.sin(pitch);
-        float ox = (float) Math.sin(yaw) * cp;   // offset direction from look point
-        float oz = (float) Math.cos(yaw) * cp;
+        float ox = (float) Math.sin(a) * cp;   // offset direction from look point
+        float oz = (float) Math.cos(a) * cp;
 
         float dist = distance;
         if (walls != null && walls.length > 0) {
@@ -101,17 +103,35 @@ public class OrbitCamera {
 
     /** Unit "forward" move axis on XZ: into the screen, away from the camera. */
     public Vector3f forwardXZ() {
-        return fwd.set(-(float) Math.sin(yaw), 0f, -(float) Math.cos(yaw));
+        float a = yaw + baseYaw;
+        return fwd.set(-(float) Math.sin(a), 0f, -(float) Math.cos(a));
     }
 
     /** Unit "right" move axis on XZ ({@code forward × up}). */
     public Vector3f rightXZ() {
-        float fx = -(float) Math.sin(yaw), fz = -(float) Math.cos(yaw);
+        float a = yaw + baseYaw;
+        float fx = -(float) Math.sin(a), fz = -(float) Math.cos(a);
         return right.set(-fz, 0f, fx);
     }
 
     public float yaw() {
         return yaw;
+    }
+
+    /**
+     * Base orbit angle added to the mouse-driven yaw, so the camera trails a
+     * heading (e.g. {@code car.heading() + PI} to sit behind a car). Use 0 for a
+     * free world-relative orbit (on foot).
+     */
+    public OrbitCamera setBaseYaw(float radians) {
+        this.baseYaw = radians;
+        return this;
+    }
+
+    /** Recenter the mouse-orbit offset (e.g. when entering a vehicle). */
+    public OrbitCamera resetYaw() {
+        this.yaw = 0f;
+        return this;
     }
 
     public OrbitCamera setDistance(float distance) {
