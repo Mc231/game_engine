@@ -1,10 +1,15 @@
 # Phase 3 — Street life (pedestrians + traffic)  → **v0.2**
 
-**Milestone:** completes **v0.2** · **Status:** 🔨 3a built (peds) — 3b (traffic) next · **Pillar:** Open city + street life
+**Milestone:** completes **v0.2** · **Status:** 🔨 built (3a+3b) — **v0.2** functionally complete, awaiting playtest · **Pillar:** Open city + street life
 
 > **3a built:** `scenes.gta.Pedestrian` (wander ↔ flee state machine, slides off buildings, own
 > walk phase) + `PedManager` (pool of 24 around the player, spawn on free ground, recycle when far).
-> Peds flee the on-foot player and moving car. Compiles, launches (exit 124). **3b traffic next.**
+> Peds flee the on-foot player and moving car.
+>
+> **3b built:** `scenes.gta.TrafficCar` (drives the road-grid node graph via `CarController`, steers
+> toward the next intersection, picks a non-reversing neighbour on arrival, pushes out of buildings) +
+> `TrafficManager` (fleet of 8 sharing one car `Model`). `City` now exposes the road-intersection node
+> grid. Compiles, launches (exit 124). **v0.2 functionally complete** — feel/AI tuning pending playtest.
 
 Make the city feel alive: **pedestrians** wandering the streets who react to the player and the
 car, and **traffic** driving the road grid. Reuses the animated `Avatar`, `Vision`, `CarController`,

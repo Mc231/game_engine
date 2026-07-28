@@ -124,6 +124,7 @@ public final class CityGenerator {
 
         return new City(ground, groundHalf, sidewalkMesh,
                 batches.toArray(new InstancedMesh[0]), tints.toArray(new Vector3f[0]),
-                colliders, grid, playerSpawn, carSpawn, 0f);
+                colliders, grid, playerSpawn, carSpawn, 0f,
+                pitch, c.blocksX, c.blocksZ, offX, offZ);
     }
 }

@@ -19,9 +19,6 @@ import org.joml.Vector3f;
  */
 public class Vehicle implements Disposable {
 
-    /** Flat ground for the driving physics in Phase 1 (city height field arrives in Phase 2). */
-    private static final CarController.Ground FLAT = (x, z) -> 0f;
-
     private final Model model;
     private final CarController controller = new CarController();
     private final float enterRadius;
@@ -42,7 +39,7 @@ public class Vehicle implements Disposable {
 
     /** Advance the driving simulation (inputs already resolved to -1..1 / brake). */
     public void update(float dt, float throttle, float steer, boolean brake) {
-        controller.update(dt, throttle, steer, brake, FLAT);
+        controller.update(dt, throttle, steer, brake, GtaGround.FLAT);
     }
 
     /** Push the car out of any overlapping building colliders (call after {@link #update}). */

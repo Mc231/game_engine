@@ -31,10 +31,17 @@ public class City implements Disposable {
     public final Vector3f carSpawn;
     public final float carHeading;
 
+    // Road network: intersection nodes sit at (offX + i*pitch, offZ + j*pitch)
+    // for i in [0,nx], j in [0,nz] — the streets that separate the blocks.
+    public final float pitch;
+    public final int nx, nz;
+    public final float offX, offZ;
+
     public City(Mesh ground, float groundHalf, InstancedMesh sidewalks,
                 InstancedMesh[] buildingBatches, Vector3f[] buildingTints,
                 List<AABB> colliders, SpatialGrid grid,
-                Vector3f playerSpawn, Vector3f carSpawn, float carHeading) {
+                Vector3f playerSpawn, Vector3f carSpawn, float carHeading,
+                float pitch, int nx, int nz, float offX, float offZ) {
         this.ground = ground;
         this.groundHalf = groundHalf;
         this.sidewalks = sidewalks;
@@ -45,6 +52,16 @@ public class City implements Disposable {
         this.playerSpawn = playerSpawn;
         this.carSpawn = carSpawn;
         this.carHeading = carHeading;
+        this.pitch = pitch;
+        this.nx = nx;
+        this.nz = nz;
+        this.offX = offX;
+        this.offZ = offZ;
+    }
+
+    /** World position of road-intersection node (i, j), i in [0,nx], j in [0,nz]. */
+    public Vector3f node(int i, int j, Vector3f dest) {
+        return dest.set(offX + i * pitch, 0f, offZ + j * pitch);
     }
 
     /** Building colliders near a world XZ position, via the broad-phase grid. */

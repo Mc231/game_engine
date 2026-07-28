@@ -1,0 +1,99 @@
+package scenes.gta;
+
+import engine.AABB;
+import engine.CarController;
+import engine.Collide;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+
+import java.util.Random;
+
+/**
+ * An AI traffic car that drives the city's road grid: it heads for a target
+ * intersection node, and on arrival picks a neighbouring node (never immediately
+ * reversing) and continues. Steering aligns the heading toward the target (the
+ * {@link CarController} steering sign: positive steer increases heading), throttle
+ * eases off in turns, and it pushes out of buildings as a safety net.
+ */
+public class TrafficCar {
+
+    private static final float BODY_RADIUS = 1.5f;
+    private static final float ARRIVE = 3.5f;
+
+    private final CarController ctrl = new CarController()
+            .setMaxSpeed(13f).setEnginePower(14f).setTurnRate(2.2f).setRideHeight(0f);
+    private final City city;
+    private final Random rng;
+    private final Matrix4f matrix = new Matrix4f();
+    private final Vector3f nodePos = new Vector3f();
+
+    private int ci, cj;   // node we came from
+    private int ti, tj;   // node we're driving to
+
+    public TrafficCar(City city, Random rng) {
+        this.city = city;
+        this.rng = rng;
+        ci = rng.nextInt(city.nx + 1);
+        cj = rng.nextInt(city.nz + 1);
+        pickTargetFrom(ci, cj);
+        city.node(ci, cj, nodePos);
+        float h = (float) Math.atan2(city.node(ti, tj, new Vector3f()).x - nodePos.x,
+                city.node(ti, tj, new Vector3f()).z - nodePos.z);
+        ctrl.setPosition(nodePos.x, 0f, nodePos.z).setHeading(h);
+    }
+
+    /** Choose a target node adjacent to (i,j), avoiding the node we came from. */
+    private void pickTargetFrom(int i, int j) {
+        int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        int[] order = {0, 1, 2, 3};
+        for (int k = order.length - 1; k > 0; k--) {   // shuffle
+            int s = rng.nextInt(k + 1);
+            int t = order[k]; order[k] = order[s]; order[s] = t;
+        }
+        int fallbackI = i, fallbackJ = j;
+        for (int o : order) {
+            int niv = i + dirs[o][0];
+            int njv = j + dirs[o][1];
+            if (niv < 0 || niv > city.nx || njv < 0 || njv > city.nz) {
+                continue;
+            }
+            fallbackI = niv; fallbackJ = njv;
+            if (niv != ci || njv != cj) {   // don't reverse if avoidable
+                ti = niv; tj = njv;
+                return;
+            }
+        }
+        ti = fallbackI; tj = fallbackJ;
+    }
+
+    public void update(float dt, AABB[] walls) {
+        Vector3f pos = ctrl.position();
+        city.node(ti, tj, nodePos);
+
+        float dx = nodePos.x - pos.x, dz = nodePos.z - pos.z;
+        if (dx * dx + dz * dz < ARRIVE * ARRIVE) {
+            int oldTi = ti, oldTj = tj;
+            ci = ti; cj = tj;               // arrived: this node becomes "came from"
+            pickTargetFrom(oldTi, oldTj);
+            city.node(ti, tj, nodePos);
+            dx = nodePos.x - pos.x; dz = nodePos.z - pos.z;
+        }
+
+        float desired = (float) Math.atan2(dx, dz);
+        float diff = (float) Math.atan2(Math.sin(desired - ctrl.heading()), Math.cos(desired - ctrl.heading()));
+        float steer = Math.max(-1f, Math.min(1f, diff * 1.6f));
+        float throttle = 1f - Math.min(0.65f, Math.abs(diff) * 0.6f);   // ease off in turns
+
+        ctrl.update(dt, throttle, steer, false, GtaGround.FLAT);
+        Collide.resolveCircle(ctrl.position(), BODY_RADIUS, walls);
+    }
+
+    public Vector3f position() {
+        return ctrl.position();
+    }
+
+    public Matrix4f matrix() {
+        Vector3f p = ctrl.position();
+        return matrix.identity().translate(p).rotateY(ctrl.heading());
+    }
+}
