@@ -1,6 +1,7 @@
 package scenes.gta;
 
 import engine.AABB;
+import engine.Audio;
 import engine.Geometry;
 import engine.Hud;
 import engine.Input;
@@ -13,6 +14,7 @@ import engine.OrbitCamera;
 import engine.ResourceManager;
 import engine.Scene;
 import engine.ShaderProgram;
+import engine.Sound;
 import engine.Texture;
 import engine.Window;
 import org.joml.Matrix4f;
@@ -73,6 +75,15 @@ public class GtaScene implements Scene {
     private Mode mode = Mode.ON_FOOT;
     private int pedsHit;
 
+    // Combat.
+    private Weapon weapon;
+    private Audio audio;
+    private Sound gunshot;
+    private float health = 100f;
+    private float flashTimer;
+    private final Vector3f muzzlePos = new Vector3f();
+    private final Vector3f aim = new Vector3f();
+
     private ThirdPersonController player;
     private OrbitCamera camera;
     private Input input;
@@ -130,6 +141,10 @@ public class GtaScene implements Scene {
                 .bind("brake", GLFW_KEY_SPACE);
         hud = new Hud();
 
+        weapon = Weapon.pistol();
+        audio = new Audio();
+        gunshot = new Sound("sounds/gunshot.wav");
+
         projection.identity().perspective((float) Math.toRadians(65.0), window.aspectRatio(), 0.1f, 600f);
     }
 
@@ -157,9 +172,23 @@ public class GtaScene implements Scene {
         lampPosts = lamps.toArray(new Vector3f[0]);
     }
 
+    private void fireWeapon() {
+        if (!weapon.tryFire()) {
+            return;
+        }
+        aim.set(camera.forwardXZ());   // copy: forwardXZ() returns an internal vector
+        Vector3f origin = new Vector3f(player.position().x, 1.5f, player.position().z);
+        peds.shoot(origin, aim, weapon.range(), weapon.damage(),
+                city.wallsNear(player.position(), weapon.range()));
+        muzzlePos.set(origin.x + aim.x * 0.9f, 1.4f, origin.z + aim.z * 0.9f);
+        flashTimer = 0.05f;
+        gunshot.play();
+    }
+
     @Override
     public void update(float deltaSeconds) {
         lights.update(deltaSeconds);
+        if (flashTimer > 0f) flashTimer -= deltaSeconds;
         camera.addLook(input.mouseDeltaX(), input.mouseDeltaY());
 
         if (mode == Mode.ON_FOOT) {
@@ -169,6 +198,11 @@ public class GtaScene implements Scene {
             boolean run = actions.isDown("run", input);
             player.update(deltaSeconds, forward, strafe, run, camera, near);
             avatar.animate(player.speed(), deltaSeconds);
+
+            weapon.update(deltaSeconds);
+            if (input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+                fireWeapon();
+            }
 
             if (input.isKeyPressed(GLFW_KEY_F) && car.nearSeat(player.position())) {
                 enterCar();
@@ -247,6 +281,11 @@ public class GtaScene implements Scene {
         peds.render();
         renderStreetFurniture();
 
+        if (flashTimer > 0f) {   // muzzle flash
+            lampMat.use();
+            lamp(muzzlePos.x, muzzlePos.y, muzzlePos.z, tmp.set(1f, 0.95f, 0.5f));
+        }
+
         // --- Sidewalks + buildings (instanced biplanar shader) ---
         cityShader.bind();
         cityShader.setUniform("uProjection", projection);
@@ -305,12 +344,16 @@ public class GtaScene implements Scene {
         int fbw = window.framebufferWidth();
         int fbh = window.framebufferHeight();
         hud.begin(fbw, fbh);
-        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 3 (street life + lights)", 1f, 1f, 1f);
+        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 4 (combat)", 1f, 1f, 1f);
         if (mode == Mode.ON_FOOT) {
-            hud.text(12, 40, 2f, "ON FOOT   speed " + String.format("%.1f", player.speed()), 0.8f, 0.9f, 1f);
+            hud.text(12, 40, 2f, "ON FOOT   health " + String.format("%.0f", health)
+                    + "   " + weapon.name() + " " + weapon.ammo(), 0.8f, 0.9f, 1f);
             String hint = car.nearSeat(player.position())
-                    ? "[F] enter car    WASD move   Shift run" : "WASD move   Shift run   mouse look";
+                    ? "[F] enter car    LMB shoot    WASD move   Shift run" : "LMB shoot    WASD move   Shift run";
             hud.text(12, 64, 1.7f, hint, 0.75f, 0.85f, 0.9f);
+            // crosshair
+            float cx = fbw / 2f, cy = fbh / 2f;
+            hud.text(cx - 4f, cy - 8f, 2.2f, "+", 1f, 1f, 1f);
         } else {
             hud.text(12, 40, 2f, "DRIVING   " + String.format("%.0f", Math.abs(car.speed()) * 3.6f) + " km/h"
                     + (pedsHit > 0 ? "     hits " + pedsHit : ""), 1f, 0.9f, 0.7f);
@@ -327,6 +370,8 @@ public class GtaScene implements Scene {
         car.dispose();
         peds.dispose();
         traffic.dispose();
+        gunshot.dispose();
+        audio.destroy();
         hud.dispose();
         resources.dispose();
     }

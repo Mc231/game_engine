@@ -29,7 +29,9 @@ public class Pedestrian {
     private float facing;
     private float speed;
     private boolean down;
+    private boolean dead;
     private float downTimer;
+    private float health = 100f;
     private final float walkSpeed;
     private final float fleeSpeed;
 
@@ -47,13 +49,24 @@ public class Pedestrian {
         pos.set(x, 0f, z);
         speed = 0f;
         down = false;
+        dead = false;
         downTimer = 0f;
+        health = 100f;
         knock.zero();
         pickTarget();
     }
 
     public boolean isDown() {
         return down;
+    }
+
+    public boolean isDead() {
+        return dead;
+    }
+
+    /** A dead pedestrian whose linger has elapsed — the manager should recycle it. */
+    public boolean readyToRecycle() {
+        return dead && downTimer <= 0f;
     }
 
     /** Knock the pedestrian down, launched along {@code dir} scaled by impact speed. */
@@ -63,8 +76,31 @@ public class Pedestrian {
         }
         down = true;
         downTimer = DOWN_TIME;
-        float k = Math.min(Math.abs(impactSpeed), 22f) * 0.4f;
-        knock.set(dir.x, 0f, dir.z).normalize().mul(k);
+        setKnock(dir, Math.min(Math.abs(impactSpeed), 22f) * 0.4f);
+    }
+
+    /** Apply gunshot damage from direction {@code dir}: stagger, or die if health hits 0. */
+    public void takeDamage(float amount, Vector3f dir) {
+        if (dead) {
+            return;
+        }
+        health -= amount;
+        down = true;
+        if (health <= 0f) {
+            dead = true;
+            downTimer = 6f;          // corpse lingers, then recycles
+            setKnock(dir, 7f);
+        } else {
+            downTimer = Math.max(downTimer, 0.5f);   // brief stagger
+            setKnock(dir, 3f);
+        }
+    }
+
+    private void setKnock(Vector3f dir, float mag) {
+        knock.set(dir.x, 0f, dir.z);
+        if (knock.lengthSquared() > 1e-6f) {
+            knock.normalize().mul(mag);
+        }
     }
 
     private void pickTarget() {
@@ -80,11 +116,11 @@ public class Pedestrian {
      */
     public void update(float dt, Vector3f playerThreat, Vector3f carThreat, AABB[] walls) {
         if (down) {
-            // Slide from the impact (decaying), then get back up.
+            // Slide from the impact (decaying); a stunned ped gets back up, a dead one lingers.
             Collide.slideXZ(pos, RADIUS, knock.x * dt, knock.z * dt, walls);
             knock.mul((float) Math.pow(0.06, dt));
             downTimer -= dt;
-            if (downTimer <= 0f) {
+            if (downTimer <= 0f && !dead) {
                 down = false;
                 pickTarget();
             }

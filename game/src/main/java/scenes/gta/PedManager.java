@@ -2,6 +2,8 @@ package scenes.gta;
 
 import engine.AABB;
 import engine.Disposable;
+import engine.Intersect;
+import engine.Ray;
 import engine.ShaderProgram;
 import engine.Texture;
 import org.joml.Vector3f;
@@ -52,7 +54,7 @@ public class PedManager implements Disposable {
         boolean carDangerous = Math.abs(carSpeed) > HIT_SPEED;
         int newHits = 0;
         for (Pedestrian p : peds) {
-            if (distSq(p.pos, anchor) > DESPAWN * DESPAWN) {
+            if (p.readyToRecycle() || distSq(p.pos, anchor) > DESPAWN * DESPAWN) {
                 freeSpawn(anchor, spawnPt);
                 p.relocate(spawnPt.x, spawnPt.z);
             }
@@ -70,6 +72,43 @@ public class PedManager implements Disposable {
         for (Pedestrian p : peds) {
             p.render();
         }
+    }
+
+    /**
+     * Hitscan the nearest live pedestrian along the ray, respecting building
+     * blockers; applies {@code damage} to it. Returns true if a ped was hit.
+     */
+    public boolean shoot(Vector3f origin, Vector3f dir, float range, float damage, AABB[] walls) {
+        Ray ray = new Ray(origin, dir);
+
+        float wallT = range;   // nearest building along the shot blocks it
+        if (walls != null) {
+            for (AABB w : walls) {
+                float t = Intersect.rayAABB(ray, w);
+                if (t >= 0f && t < wallT) {
+                    wallT = t;
+                }
+            }
+        }
+
+        Pedestrian best = null;
+        float bestT = range;
+        for (Pedestrian p : peds) {
+            if (p.isDead()) {
+                continue;
+            }
+            AABB box = AABB.fromCenterSize(new Vector3f(p.pos.x, 1f, p.pos.z), new Vector3f(1.1f, 2f, 1.1f));
+            float t = Intersect.rayAABB(ray, box);
+            if (t >= 0f && t < bestT && t < wallT) {
+                bestT = t;
+                best = p;
+            }
+        }
+        if (best != null) {
+            best.takeDamage(damage, dir);
+            return true;
+        }
+        return false;
     }
 
     /** Current pedestrian positions (fresh array), e.g. as traffic hazards. */

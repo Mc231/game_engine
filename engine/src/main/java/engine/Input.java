@@ -27,6 +27,7 @@ public class Input {
     }
 
     private final Map<Integer, Boolean> pressedLastCall = new HashMap<>();
+    private final Map<Integer, Boolean> mousePressedLastCall = new HashMap<>();
 
     /** True while the given GLFW key (e.g. {@code GLFW_KEY_W}) is held down. */
     public boolean isKeyDown(int key) {
@@ -41,6 +42,19 @@ public class Input {
         boolean down = isKeyDown(key);
         boolean wasDown = pressedLastCall.getOrDefault(key, false);
         pressedLastCall.put(key, down);
+        return down && !wasDown;
+    }
+
+    /** True while the given GLFW mouse button (e.g. {@code GLFW_MOUSE_BUTTON_LEFT}) is held. */
+    public boolean isMouseButtonDown(int button) {
+        return glfwGetMouseButton(window, button) == GLFW_PRESS;
+    }
+
+    /** True only on the frame the mouse button transitions from up to down (edge). */
+    public boolean isMouseButtonPressed(int button) {
+        boolean down = isMouseButtonDown(button);
+        boolean wasDown = mousePressedLastCall.getOrDefault(button, false);
+        mousePressedLastCall.put(button, down);
         return down && !wasDown;
     }
 
