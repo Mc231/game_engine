@@ -36,11 +36,13 @@ simulating what's near the player (spawn around, despawn far away).
   on the road network. *Done when:* cars drive the grid and react to obstacles. **This is the v0.2 bar.**
   *(Also done: hazard braking — cars stop for pedestrians and other cars — and car↔car separation so
   vehicles never overlap. Counts raised to 40 peds / 14 cars.)*
-- **3c — Traffic lights (planned, not built).** Per-intersection signal controllers cycling
-  N–S green ↔ E–W green (+ amber); a `TrafficCar` approaching a red-facing intersection brakes at the
-  stop line, resumes on green. Pedestrians ideally wait at reds too (stretch). New: `TrafficLights`
-  (intersection state machine keyed on the road-node grid the city already exposes) + a light-post
-  model/emissive quad. Moderate effort ★★; the node grid + hazard-braking make it a natural extension.
+- **3c — Traffic lights (built).** `TrafficLights` — a global signal cycle (N–S green → amber →
+  E–W green → amber). A `TrafficCar` approaching its target intersection brakes at the stop line
+  when its road's signal isn't green, and resumes on green (reuses the hazard-brake path). Rendered
+  as colored signal heads on posts at every intersection. *(Ped-waits-at-red is a later stretch.)*
+- **2d — Street dressing (built).** Distance fog on both the lit and city shaders (buildings fade
+  to a horizon color that matches the sky), signal/lamp **posts** at intersections, and decorative
+  **street lamps** (warm emissive heads) along the road edges. Adds depth + vertical street furniture.
 
 ## Engine pieces reused
 

@@ -40,7 +40,7 @@ public class TrafficManager implements Disposable {
      * @param pedPositions   pedestrian positions (traffic brakes for them)
      * @param playerCarPos   the player's car (traffic brakes for and is separated from it)
      */
-    public void update(float dt, Vector3f[] pedPositions, Vector3f playerCarPos) {
+    public void update(float dt, Vector3f[] pedPositions, Vector3f playerCarPos, TrafficLights lights) {
         int n = cars.size();
 
         // Hazards each car brakes for: peds + player car + all traffic cars
@@ -53,7 +53,7 @@ public class TrafficManager implements Disposable {
         }
 
         for (TrafficCar c : cars) {
-            c.update(dt, city.wallsNear(c.position(), 14f), hazards);
+            c.update(dt, city.wallsNear(c.position(), 14f), hazards, lights);
         }
 
         // Physical separation so cars never overlap: split pushes between two

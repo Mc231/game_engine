@@ -1,11 +1,13 @@
 package scenes.gta;
 
 import engine.AABB;
+import engine.Geometry;
 import engine.Hud;
 import engine.Input;
 import engine.InputMap;
 import engine.Light;
 import engine.Material;
+import engine.Mesh;
 import engine.Model;
 import engine.OrbitCamera;
 import engine.ResourceManager;
@@ -15,6 +17,9 @@ import engine.Texture;
 import engine.Window;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -42,9 +47,18 @@ public class GtaScene implements Scene {
     private static final float NEAR_RADIUS = 26f;
 
     private final ResourceManager resources = new ResourceManager();
-    private ShaderProgram litShader;    // ground, car, avatar (Phong, textured)
+    // Fog / horizon.
+    private static final float FOG_DENSITY = 0.006f;
+    private final Vector3f fogColor = new Vector3f(0.62f, 0.70f, 0.80f);
+    // Street-furniture placement offsets (≈ half the road width).
+    private static final float LIGHT_CORNER = 5.5f, LAMP_SIDE = 5.5f;
+
+    private ShaderProgram litShader;    // ground, car, avatar, props (Phong, textured)
     private ShaderProgram cityShader;   // instanced sidewalks + buildings (biplanar, directional)
     private Material asphaltMat;
+    private Material postMat;           // grey light poles
+    private Material lampMat;           // emissive lamp heads (tint set per draw)
+    private Mesh propCube;              // unit cube for poles/lamps
     private Texture concreteTex;
     private Texture facadeTex;
 
@@ -53,6 +67,9 @@ public class GtaScene implements Scene {
     private Vehicle car;
     private PedManager peds;
     private TrafficManager traffic;
+    private TrafficLights lights;
+    private Vector3f[] lightNodes;      // intersection signal posts
+    private Vector3f[] lampPosts;       // decorative street lamps
     private Mode mode = Mode.ON_FOOT;
 
     private ThirdPersonController player;
@@ -62,11 +79,12 @@ public class GtaScene implements Scene {
     private Hud hud;
     private Window window;
 
-    private final Light[] lights = new Light[2];
+    private final Light[] worldLights = new Light[2];
     private final Vector3f lightDir = new Vector3f(-0.4f, -1f, -0.3f).normalize();
     private final Vector3f lightColor = new Vector3f(1f, 0.97f, 0.9f);
     private final Matrix4f projection = new Matrix4f();
     private final Matrix4f identity = new Matrix4f();
+    private final Matrix4f model = new Matrix4f();
     private final Vector3f tmp = new Vector3f();
 
     @Override
@@ -80,8 +98,13 @@ public class GtaScene implements Scene {
         facadeTex = resources.texture("textures/facade.png");
         Texture white = resources.texture("textures/white.png");
         asphaltMat = new Material(litShader, asphaltTex).setTint(0.5f, 0.5f, 0.52f).setAmbientStrength(0.4f);
+        postMat = new Material(litShader, white).setTint(0.2f, 0.2f, 0.23f).setAmbientStrength(0.5f);
+        lampMat = new Material(litShader, white).setTint(1f, 1f, 1f).setAmbientStrength(1f);
+        propCube = new Mesh(Geometry.cubeWithNormalsAndUV(), new int[]{3, 3, 2});
 
         city = CityGenerator.generate(new CityGenerator.Config());
+        lights = new TrafficLights();
+        buildStreetFurniture();
 
         avatar = new Avatar(litShader, white, Avatar.civilian());
         Model carModel = Model.load("models/car/car.obj", litShader, resources);
@@ -89,8 +112,8 @@ public class GtaScene implements Scene {
         peds = new PedManager(litShader, white, city, 40, 99L);
         traffic = new TrafficManager(litShader, resources, city, 14, 7L);
 
-        lights[0] = Light.directional(lightDir, new Vector3f(0.9f, 0.88f, 0.82f));
-        lights[1] = Light.point(new Vector3f(0f, 20f, 0f), new Vector3f(0.35f, 0.37f, 0.45f));
+        worldLights[0] = Light.directional(lightDir, new Vector3f(0.9f, 0.88f, 0.82f));
+        worldLights[1] = Light.point(new Vector3f(0f, 20f, 0f), new Vector3f(0.35f, 0.37f, 0.45f));
 
         player = new ThirdPersonController(city.playerSpawn.x, city.playerSpawn.z, 0f);
         camera = new OrbitCamera().setPitch(0.5f).setDistance(FOOT_DISTANCE).setTargetHeight(FOOT_HEIGHT);
@@ -109,8 +132,33 @@ public class GtaScene implements Scene {
         projection.identity().perspective((float) Math.toRadians(65.0), window.aspectRatio(), 0.1f, 600f);
     }
 
+    /** Precompute signal-post positions (intersections) and decorative lamp posts (road edges). */
+    private void buildStreetFurniture() {
+        List<Vector3f> nodes = new ArrayList<>();
+        for (int i = 0; i <= city.nx; i++) {
+            for (int j = 0; j <= city.nz; j++) {
+                nodes.add(city.node(i, j, new Vector3f()));
+            }
+        }
+        lightNodes = nodes.toArray(new Vector3f[0]);
+
+        List<Vector3f> lamps = new ArrayList<>();
+        for (int i = 0; i < city.nx; i++) {          // midpoints of E–W road segments
+            for (int j = 0; j <= city.nz; j++) {
+                lamps.add(new Vector3f(city.offX + (i + 0.5f) * city.pitch, 0f, city.offZ + j * city.pitch + LAMP_SIDE));
+            }
+        }
+        for (int i = 0; i <= city.nx; i++) {          // midpoints of N–S road segments
+            for (int j = 0; j < city.nz; j++) {
+                lamps.add(new Vector3f(city.offX + i * city.pitch + LAMP_SIDE, 0f, city.offZ + (j + 0.5f) * city.pitch));
+            }
+        }
+        lampPosts = lamps.toArray(new Vector3f[0]);
+    }
+
     @Override
     public void update(float deltaSeconds) {
+        lights.update(deltaSeconds);
         camera.addLook(input.mouseDeltaX(), input.mouseDeltaY());
 
         if (mode == Mode.ON_FOOT) {
@@ -146,7 +194,7 @@ public class GtaScene implements Scene {
         Vector3f carThreat = mode == Mode.DRIVING ? car.position() : null;
         Vector3f anchor = mode == Mode.DRIVING ? car.position() : player.position();
         peds.update(deltaSeconds, playerThreat, carThreat, anchor);
-        traffic.update(deltaSeconds, peds.positions(), car.position());
+        traffic.update(deltaSeconds, peds.positions(), car.position(), lights);
     }
 
     private void enterCar() {
@@ -170,18 +218,19 @@ public class GtaScene implements Scene {
 
     @Override
     public void render() {
-        glClearColor(0.55f, 0.66f, 0.78f, 1f);
+        glClearColor(fogColor.x, fogColor.y, fogColor.z, 1f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         Matrix4f view = camera.viewMatrix();
 
-        // --- Ground, car, avatar (lit/Phong shader) ---
+        // --- Ground, car, avatar, props (lit/Phong shader) ---
         litShader.bind();
         litShader.setUniform("uProjection", projection);
         litShader.setUniform("uView", view);
         litShader.setUniform("uViewPos", camera.position());
-        litShader.setUniform("uFogDensity", 0f);
-        litShader.setUniform("uLightCount", lights.length);
-        for (int i = 0; i < lights.length; i++) lights[i].apply(litShader, "uLights[" + i + "]");
+        litShader.setUniform("uFogColor", fogColor);
+        litShader.setUniform("uFogDensity", FOG_DENSITY);
+        litShader.setUniform("uLightCount", worldLights.length);
+        for (int i = 0; i < worldLights.length; i++) worldLights[i].apply(litShader, "uLights[" + i + "]");
 
         asphaltMat.use();
         litShader.setUniform("uModel", identity);
@@ -194,11 +243,15 @@ public class GtaScene implements Scene {
             avatar.render(player.position(), player.facing());
         }
         peds.render();
+        renderStreetFurniture();
 
         // --- Sidewalks + buildings (instanced biplanar shader) ---
         cityShader.bind();
         cityShader.setUniform("uProjection", projection);
         cityShader.setUniform("uView", view);
+        cityShader.setUniform("uViewPos", camera.position());
+        cityShader.setUniform("uFogColor", fogColor);
+        cityShader.setUniform("uFogDensity", FOG_DENSITY);
         cityShader.setUniform("uLightDir", lightDir);
         cityShader.setUniform("uLightColor", lightColor);
         cityShader.setUniform("uAmbient", 0.45f);
@@ -219,11 +272,38 @@ public class GtaScene implements Scene {
         renderHud();
     }
 
+    /** Signal posts at intersections (colored by phase) + decorative street lamps. */
+    private void renderStreetFurniture() {
+        postMat.use();
+        for (Vector3f n : lightNodes) pole(n.x + LIGHT_CORNER, n.z + LIGHT_CORNER);
+        for (Vector3f p : lampPosts) pole(p.x, p.z);
+
+        lampMat.use();
+        Vector3f ns = lights.nsColor(), ew = lights.ewColor();
+        for (Vector3f n : lightNodes) {
+            lamp(n.x + LIGHT_CORNER, 4.3f, n.z + LIGHT_CORNER, ns);   // N–S signal head
+            lamp(n.x + LIGHT_CORNER, 3.5f, n.z + LIGHT_CORNER, ew);   // E–W signal head
+        }
+        Vector3f warm = tmp.set(1f, 0.85f, 0.55f);
+        for (Vector3f p : lampPosts) lamp(p.x, 4.1f, p.z, warm);
+    }
+
+    private void pole(float x, float z) {
+        litShader.setUniform("uModel", model.identity().translate(x, 2.2f, z).scale(0.22f, 4.4f, 0.22f));
+        propCube.render();
+    }
+
+    private void lamp(float x, float y, float z, Vector3f color) {
+        litShader.setUniform("uTint", color);
+        litShader.setUniform("uModel", model.identity().translate(x, y, z).scale(0.5f, 0.5f, 0.5f));
+        propCube.render();
+    }
+
     private void renderHud() {
         int fbw = window.framebufferWidth();
         int fbh = window.framebufferHeight();
         hud.begin(fbw, fbh);
-        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 3 (street life)", 1f, 1f, 1f);
+        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 3 (street life + lights)", 1f, 1f, 1f);
         if (mode == Mode.ON_FOOT) {
             hud.text(12, 40, 2f, "ON FOOT   speed " + String.format("%.1f", player.speed()), 0.8f, 0.9f, 1f);
             String hint = car.nearSeat(player.position())
@@ -239,6 +319,7 @@ public class GtaScene implements Scene {
     @Override
     public void dispose() {
         city.dispose();
+        propCube.dispose();
         avatar.dispose();
         car.dispose();
         peds.dispose();

@@ -12,6 +12,11 @@ uniform vec3 uLightColor;
 uniform float uAmbient;
 uniform float uTexScale;
 
+// Distance fog toward the horizon (uFogDensity 0 = off).
+uniform vec3 uViewPos;
+uniform vec3 uFogColor;
+uniform float uFogDensity;
+
 void main() {
     vec3 N = normalize(vNormal);
 
@@ -27,5 +32,12 @@ void main() {
     vec3 base = texture(uTexture, uv).rgb * uTint;
     float d = max(dot(N, normalize(-uLightDir)), 0.0);
     float light = uAmbient + (1.0 - uAmbient) * d;
-    FragColor = vec4(base * light * uLightColor, 1.0);
+    vec3 color = base * light * uLightColor;
+
+    if (uFogDensity > 0.0) {
+        float dist = length(uViewPos - vWorld);
+        float fog = 1.0 - exp(-dist * uFogDensity);
+        color = mix(color, uFogColor, clamp(fog, 0.0, 1.0));
+    }
+    FragColor = vec4(color, 1.0);
 }

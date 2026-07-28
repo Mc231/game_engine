@@ -70,29 +70,41 @@ public class TrafficCar {
         ti = fallbackI; tj = fallbackJ;
     }
 
+    private static final float STOP_LINE = 6f;   // brake before a red-facing intersection
+
     /**
      * @param walls   nearby building colliders
      * @param hazards points (pedestrians, other cars) to brake for; a point at
      *                this car's own position is ignored (it never brakes for itself)
+     * @param lights  the city signal cycle (may be null)
      */
-    public void update(float dt, AABB[] walls, Vector3f[] hazards) {
+    public void update(float dt, AABB[] walls, Vector3f[] hazards, TrafficLights lights) {
         Vector3f pos = ctrl.position();
         city.node(ti, tj, nodePos);
 
         float dx = nodePos.x - pos.x, dz = nodePos.z - pos.z;
-        if (dx * dx + dz * dz < ARRIVE * ARRIVE) {
+        float distToNode = (float) Math.sqrt(dx * dx + dz * dz);
+        if (distToNode < ARRIVE) {
             int oldTi = ti, oldTj = tj;
             ci = ti; cj = tj;               // arrived: this node becomes "came from"
             pickTargetFrom(oldTi, oldTj);
             city.node(ti, tj, nodePos);
             dx = nodePos.x - pos.x; dz = nodePos.z - pos.z;
+            distToNode = (float) Math.sqrt(dx * dx + dz * dz);
         }
 
         float desired = (float) Math.atan2(dx, dz);
         float diff = (float) Math.atan2(Math.sin(desired - ctrl.heading()), Math.cos(desired - ctrl.heading()));
         float steer = Math.max(-1f, Math.min(1f, diff * 1.6f));
 
-        boolean brake = hazardAhead(pos, hazards);
+        // Stop at the approaching intersection when this car's road has a red/amber.
+        boolean redLight = false;
+        if (lights != null && distToNode < STOP_LINE) {
+            boolean nsAxis = tj != cj;   // travelling along Z ⇒ N–S road
+            redLight = !lights.isGreen(nsAxis);
+        }
+
+        boolean brake = redLight || hazardAhead(pos, hazards);
         float throttle = brake ? 0f : 1f - Math.min(0.65f, Math.abs(diff) * 0.6f);   // ease off in turns
 
         ctrl.update(dt, throttle, steer, brake, GtaGround.FLAT);
