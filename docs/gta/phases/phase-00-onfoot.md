@@ -1,6 +1,6 @@
 # Phase 0 — Third-person on-foot *(foundation)*
 
-**Milestone:** part of v0.1 · **Status:** 🔨 built — awaiting playtest · **Pillar:** foundation
+**Milestone:** part of v0.1 · **Status:** ✅ done (playtested) · **Pillar:** foundation
 
 > **Built:** `engine.OrbitCamera` (orbit + raycast wall pull-in, unit-tested),
 > `scenes.city.Avatar` (animated humanoid, configurable palette),

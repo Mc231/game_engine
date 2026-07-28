@@ -1,6 +1,6 @@
 # Phase 1 — Vehicle entry + driving  → **v0.1**
 
-**Milestone:** completes **v0.1** (traversal slice) · **Status:** 🔨 built — awaiting playtest · **Pillar:** Driving
+**Milestone:** completes **v0.1** (traversal slice) · **Status:** ✅ done (playtested) — **v0.1 shipped** · **Pillar:** Driving
 
 > **Built:** `scenes.city.Vehicle` (Model + CarController + seat/exit/proximity),
 > `Mode` state machine in `GtaScene` (ON_FOOT ↔ DRIVING, F to toggle), per-mode camera profiles,
