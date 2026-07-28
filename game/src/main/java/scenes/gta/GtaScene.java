@@ -84,6 +84,12 @@ public class GtaScene implements Scene {
     private final Vector3f muzzlePos = new Vector3f();
     private final Vector3f aim = new Vector3f();
 
+    // Wanted level + police.
+    private WantedSystem wanted;
+    private PoliceManager police;
+    private float damagedTimer;   // suppresses health regen after being shot
+    private float wastedFlash;
+
     private ThirdPersonController player;
     private OrbitCamera camera;
     private Input input;
@@ -144,6 +150,8 @@ public class GtaScene implements Scene {
         weapon = Weapon.pistol();
         audio = new Audio();
         gunshot = new Sound("sounds/gunshot.wav");
+        wanted = new WantedSystem();
+        police = new PoliceManager(litShader, white, city, gunshot);
 
         projection.identity().perspective((float) Math.toRadians(65.0), window.aspectRatio(), 0.1f, 600f);
     }
@@ -178,8 +186,12 @@ public class GtaScene implements Scene {
         }
         aim.set(camera.forwardXZ());   // copy: forwardXZ() returns an internal vector
         Vector3f origin = new Vector3f(player.position().x, 1.5f, player.position().z);
-        peds.shoot(origin, aim, weapon.range(), weapon.damage(),
-                city.wallsNear(player.position(), weapon.range()));
+        AABB[] walls = city.wallsNear(player.position(), weapon.range());
+        // Police take priority; otherwise a hit ped is a crime that raises the wanted level.
+        boolean hitCop = police.shoot(origin, aim, weapon.range(), weapon.damage(), walls);
+        if (!hitCop && peds.shoot(origin, aim, weapon.range(), weapon.damage(), walls)) {
+            wanted.addCrime(20f);
+        }
         muzzlePos.set(origin.x + aim.x * 0.9f, 1.4f, origin.z + aim.z * 0.9f);
         flashTimer = 0.05f;
         gunshot.play();
@@ -189,6 +201,7 @@ public class GtaScene implements Scene {
     public void update(float deltaSeconds) {
         lights.update(deltaSeconds);
         if (flashTimer > 0f) flashTimer -= deltaSeconds;
+        if (wastedFlash > 0f) wastedFlash -= deltaSeconds;
         camera.addLook(input.mouseDeltaX(), input.mouseDeltaY());
 
         if (mode == Mode.ON_FOOT) {
@@ -228,9 +241,36 @@ public class GtaScene implements Scene {
         Vector3f playerThreat = mode == Mode.ON_FOOT ? player.position() : null;
         Vector3f carThreat = mode == Mode.DRIVING ? car.position() : null;
         Vector3f anchor = mode == Mode.DRIVING ? car.position() : player.position();
-        pedsHit += peds.update(deltaSeconds, playerThreat, carThreat, anchor,
+        int carHits = peds.update(deltaSeconds, playerThreat, carThreat, anchor,
                 car.position(), car.forward(), car.speed());
+        pedsHit += carHits;
+        if (carHits > 0) wanted.addCrime(15f * carHits);
         traffic.update(deltaSeconds, peds.positions(), car.position(), lights);
+
+        // Police response + wanted decay.
+        Vector3f target = mode == Mode.DRIVING ? car.position() : player.position();
+        float dmg = police.update(deltaSeconds, wanted.stars(), target);
+        if (dmg > 0f) {
+            health -= dmg;
+            damagedTimer = 2.5f;
+        }
+        wanted.update(deltaSeconds, police.seesTarget());
+        if (damagedTimer > 0f) damagedTimer -= deltaSeconds;
+        if (!wanted.wanted() && damagedTimer <= 0f && health < 100f) {
+            health = Math.min(100f, health + 7f * deltaSeconds);   // slow regen when clean
+        }
+        if (health <= 0f) wasted();
+    }
+
+    private void wasted() {
+        mode = Mode.ON_FOOT;
+        player.place(city.playerSpawn.x, city.playerSpawn.z, 0f);
+        health = 100f;
+        wanted.clear();
+        police.clearAll();
+        damagedTimer = 0f;
+        wastedFlash = 2.5f;
+        camera.setDistance(FOOT_DISTANCE).setTargetHeight(FOOT_HEIGHT).setBaseYaw(0f).resetYaw();
     }
 
     private void enterCar() {
@@ -279,6 +319,7 @@ public class GtaScene implements Scene {
             avatar.render(player.position(), player.facing());
         }
         peds.render();
+        police.render();
         renderStreetFurniture();
 
         if (flashTimer > 0f) {   // muzzle flash
@@ -344,7 +385,17 @@ public class GtaScene implements Scene {
         int fbw = window.framebufferWidth();
         int fbh = window.framebufferHeight();
         hud.begin(fbw, fbh);
-        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 4 (combat)", 1f, 1f, 1f);
+        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 5 (wanted)", 1f, 1f, 1f);
+
+        int stars = wanted.stars();
+        if (stars > 0) {
+            StringBuilder s = new StringBuilder("WANTED ");
+            for (int i = 0; i < stars; i++) s.append("* ");
+            hud.text(fbw - 220f, 12f, 2.4f, s.toString(), 1f, 0.85f, 0.2f);
+        }
+        if (wastedFlash > 0f) {
+            hud.text(fbw / 2f - 120f, fbh / 2f - 60f, 5f, "WASTED", 1f, 0.25f, 0.2f);
+        }
         if (mode == Mode.ON_FOOT) {
             hud.text(12, 40, 2f, "ON FOOT   health " + String.format("%.0f", health)
                     + "   " + weapon.name() + " " + weapon.ammo(), 0.8f, 0.9f, 1f);
@@ -370,6 +421,7 @@ public class GtaScene implements Scene {
         car.dispose();
         peds.dispose();
         traffic.dispose();
+        police.dispose();
         gunshot.dispose();
         audio.destroy();
         hud.dispose();

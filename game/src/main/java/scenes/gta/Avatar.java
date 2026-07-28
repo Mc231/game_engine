@@ -43,6 +43,15 @@ public class Avatar implements Disposable {
                 new Vector3f(0.10f, 0.10f, 0.11f));
     }
 
+    /** A police look: dark-blue uniform + cap. */
+    public static Palette police() {
+        return new Palette(
+                new Vector3f(0.12f, 0.18f, 0.42f),
+                new Vector3f(0.80f, 0.62f, 0.48f),
+                new Vector3f(0.06f, 0.08f, 0.18f),
+                new Vector3f(0.05f, 0.05f, 0.07f));
+    }
+
     /** A randomized civilian look (varied shirt + skin) for crowd variety. */
     public static Palette civilian(java.util.Random rng) {
         return new Palette(
