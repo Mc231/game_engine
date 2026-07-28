@@ -52,6 +52,11 @@ public class City implements Disposable {
         return grid.nearby(p.x, p.z, radius);
     }
 
+    /** Building colliders near a world XZ coordinate. */
+    public AABB[] wallsNear(float x, float z, float radius) {
+        return grid.nearby(x, z, radius);
+    }
+
     @Override
     public void dispose() {
         ground.dispose();

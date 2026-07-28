@@ -43,6 +43,15 @@ public class Avatar implements Disposable {
                 new Vector3f(0.10f, 0.10f, 0.11f));
     }
 
+    /** A randomized civilian look (varied shirt + skin) for crowd variety. */
+    public static Palette civilian(java.util.Random rng) {
+        return new Palette(
+                new Vector3f(0.20f + rng.nextFloat() * 0.6f, 0.20f + rng.nextFloat() * 0.6f, 0.20f + rng.nextFloat() * 0.6f),
+                new Vector3f(0.72f + rng.nextFloat() * 0.16f, 0.52f + rng.nextFloat() * 0.14f, 0.40f + rng.nextFloat() * 0.12f),
+                new Vector3f(0.12f, 0.13f, 0.17f),
+                new Vector3f(0.10f, 0.10f, 0.11f));
+    }
+
     private final Mesh cube;
     private final Material uniformMat, skinMat, capMat, beltMat;
     private final ShaderProgram shader;

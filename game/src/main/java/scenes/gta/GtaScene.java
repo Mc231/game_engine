@@ -51,6 +51,7 @@ public class GtaScene implements Scene {
     private City city;
     private Avatar avatar;
     private Vehicle car;
+    private PedManager peds;
     private Mode mode = Mode.ON_FOOT;
 
     private ThirdPersonController player;
@@ -84,6 +85,7 @@ public class GtaScene implements Scene {
         avatar = new Avatar(litShader, white, Avatar.civilian());
         Model carModel = Model.load("models/car/car.obj", litShader, resources);
         car = new Vehicle(carModel, city.carSpawn.x, city.carSpawn.z, city.carHeading, 3.6f, new Vector3f(-1.9f, 0f, 0f));
+        peds = new PedManager(litShader, white, city, 24, 99L);
 
         lights[0] = Light.directional(lightDir, new Vector3f(0.9f, 0.88f, 0.82f));
         lights[1] = Light.point(new Vector3f(0f, 20f, 0f), new Vector3f(0.35f, 0.37f, 0.45f));
@@ -136,6 +138,12 @@ public class GtaScene implements Scene {
             camera.setBaseYaw(car.heading() + (float) Math.PI);
             camera.update(car.position(), deltaSeconds, near);
         }
+
+        // Pedestrians flee the on-foot player, or a moving car.
+        Vector3f playerThreat = mode == Mode.ON_FOOT ? player.position() : null;
+        Vector3f carThreat = mode == Mode.DRIVING ? car.position() : null;
+        Vector3f anchor = mode == Mode.DRIVING ? car.position() : player.position();
+        peds.update(deltaSeconds, playerThreat, carThreat, anchor);
     }
 
     private void enterCar() {
@@ -181,6 +189,7 @@ public class GtaScene implements Scene {
         if (mode == Mode.ON_FOOT) {
             avatar.render(player.position(), player.facing());
         }
+        peds.render();
 
         // --- Sidewalks + buildings (instanced biplanar shader) ---
         cityShader.bind();
@@ -210,7 +219,7 @@ public class GtaScene implements Scene {
         int fbw = window.framebufferWidth();
         int fbh = window.framebufferHeight();
         hud.begin(fbw, fbh);
-        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 2 (city)", 1f, 1f, 1f);
+        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 3 (street life)", 1f, 1f, 1f);
         if (mode == Mode.ON_FOOT) {
             hud.text(12, 40, 2f, "ON FOOT   speed " + String.format("%.1f", player.speed()), 0.8f, 0.9f, 1f);
             String hint = car.nearSeat(player.position())
@@ -228,6 +237,7 @@ public class GtaScene implements Scene {
         city.dispose();
         avatar.dispose();
         car.dispose();
+        peds.dispose();
         hud.dispose();
         resources.dispose();
     }
