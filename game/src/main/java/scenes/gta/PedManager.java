@@ -54,6 +54,15 @@ public class PedManager implements Disposable {
         }
     }
 
+    /** Current pedestrian positions (fresh array), e.g. as traffic hazards. */
+    public Vector3f[] positions() {
+        Vector3f[] out = new Vector3f[peds.size()];
+        for (int i = 0; i < peds.size(); i++) {
+            out[i] = peds.get(i).pos;
+        }
+        return out;
+    }
+
     /** Pick a point ringed around {@code around} that isn't inside a building. */
     private void freeSpawn(Vector3f around, Vector3f out) {
         for (int attempt = 0; attempt < 12; attempt++) {

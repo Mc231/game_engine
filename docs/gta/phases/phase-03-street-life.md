@@ -34,6 +34,13 @@ simulating what's near the player (spawn around, despawn far away).
   reactive walkers. **← building now.**
 - **3b — Traffic.** `TrafficCar` (follow a grid lane path via `CarController`, brake/avoid) + spawn
   on the road network. *Done when:* cars drive the grid and react to obstacles. **This is the v0.2 bar.**
+  *(Also done: hazard braking — cars stop for pedestrians and other cars — and car↔car separation so
+  vehicles never overlap. Counts raised to 40 peds / 14 cars.)*
+- **3c — Traffic lights (planned, not built).** Per-intersection signal controllers cycling
+  N–S green ↔ E–W green (+ amber); a `TrafficCar` approaching a red-facing intersection brakes at the
+  stop line, resumes on green. Pedestrians ideally wait at reds too (stretch). New: `TrafficLights`
+  (intersection state machine keyed on the road-node grid the city already exposes) + a light-post
+  model/emissive quad. Moderate effort ★★; the node grid + hazard-braking make it a natural extension.
 
 ## Engine pieces reused
 

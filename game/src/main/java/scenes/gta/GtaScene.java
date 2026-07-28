@@ -86,8 +86,8 @@ public class GtaScene implements Scene {
         avatar = new Avatar(litShader, white, Avatar.civilian());
         Model carModel = Model.load("models/car/car.obj", litShader, resources);
         car = new Vehicle(carModel, city.carSpawn.x, city.carSpawn.z, city.carHeading, 3.6f, new Vector3f(-1.9f, 0f, 0f));
-        peds = new PedManager(litShader, white, city, 24, 99L);
-        traffic = new TrafficManager(litShader, resources, city, 8, 7L);
+        peds = new PedManager(litShader, white, city, 40, 99L);
+        traffic = new TrafficManager(litShader, resources, city, 14, 7L);
 
         lights[0] = Light.directional(lightDir, new Vector3f(0.9f, 0.88f, 0.82f));
         lights[1] = Light.point(new Vector3f(0f, 20f, 0f), new Vector3f(0.35f, 0.37f, 0.45f));
@@ -146,7 +146,7 @@ public class GtaScene implements Scene {
         Vector3f carThreat = mode == Mode.DRIVING ? car.position() : null;
         Vector3f anchor = mode == Mode.DRIVING ? car.position() : player.position();
         peds.update(deltaSeconds, playerThreat, carThreat, anchor);
-        traffic.update(deltaSeconds);
+        traffic.update(deltaSeconds, peds.positions(), car.position());
     }
 
     private void enterCar() {

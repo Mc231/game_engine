@@ -19,6 +19,10 @@ public class TrafficCar {
 
     private static final float BODY_RADIUS = 1.5f;
     private static final float ARRIVE = 3.5f;
+    // Forward zone in which a pedestrian/car makes this car brake.
+    private static final float BRAKE_DIST = 7.5f;
+    private static final float BRAKE_HALF_WIDTH = 2.2f;
+    private final Vector3f fwd = new Vector3f();
 
     private final CarController ctrl = new CarController()
             .setMaxSpeed(13f).setEnginePower(14f).setTurnRate(2.2f).setRideHeight(0f);
@@ -66,7 +70,12 @@ public class TrafficCar {
         ti = fallbackI; tj = fallbackJ;
     }
 
-    public void update(float dt, AABB[] walls) {
+    /**
+     * @param walls   nearby building colliders
+     * @param hazards points (pedestrians, other cars) to brake for; a point at
+     *                this car's own position is ignored (it never brakes for itself)
+     */
+    public void update(float dt, AABB[] walls, Vector3f[] hazards) {
         Vector3f pos = ctrl.position();
         city.node(ti, tj, nodePos);
 
@@ -82,10 +91,31 @@ public class TrafficCar {
         float desired = (float) Math.atan2(dx, dz);
         float diff = (float) Math.atan2(Math.sin(desired - ctrl.heading()), Math.cos(desired - ctrl.heading()));
         float steer = Math.max(-1f, Math.min(1f, diff * 1.6f));
-        float throttle = 1f - Math.min(0.65f, Math.abs(diff) * 0.6f);   // ease off in turns
 
-        ctrl.update(dt, throttle, steer, false, GtaGround.FLAT);
+        boolean brake = hazardAhead(pos, hazards);
+        float throttle = brake ? 0f : 1f - Math.min(0.65f, Math.abs(diff) * 0.6f);   // ease off in turns
+
+        ctrl.update(dt, throttle, steer, brake, GtaGround.FLAT);
         Collide.resolveCircle(ctrl.position(), BODY_RADIUS, walls);
+    }
+
+    /** True if any hazard sits in the forward brake zone (ignores this car itself). */
+    private boolean hazardAhead(Vector3f pos, Vector3f[] hazards) {
+        if (hazards == null) {
+            return false;
+        }
+        fwd.set((float) Math.sin(ctrl.heading()), 0f, (float) Math.cos(ctrl.heading()));
+        for (Vector3f h : hazards) {
+            float dx = h.x - pos.x, dz = h.z - pos.z;
+            float ahead = dx * fwd.x + dz * fwd.z;              // forward distance
+            if (ahead > 0.6f && ahead < BRAKE_DIST) {
+                float lateral = Math.abs(dx * -fwd.z + dz * fwd.x);   // perpendicular offset
+                if (lateral < BRAKE_HALF_WIDTH) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public Vector3f position() {
