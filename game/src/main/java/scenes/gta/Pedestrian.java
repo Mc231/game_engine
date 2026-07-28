@@ -18,13 +18,18 @@ public class Pedestrian {
     private static final float PLAYER_FEAR = 6f;   // flee if the on-foot player is closer than this
     private static final float CAR_FEAR = 11f;     // a moving car is scarier (bigger radius)
 
+    private static final float DOWN_TIME = 4.5f;   // seconds knocked out before getting up
+
     private final Avatar avatar;
     private final Random rng;
     final Vector3f pos = new Vector3f();
     private final Vector3f target = new Vector3f();
     private final Vector3f dir = new Vector3f();
+    private final Vector3f knock = new Vector3f();   // knockback velocity while down
     private float facing;
     private float speed;
+    private boolean down;
+    private float downTimer;
     private final float walkSpeed;
     private final float fleeSpeed;
 
@@ -41,7 +46,25 @@ public class Pedestrian {
     public void relocate(float x, float z) {
         pos.set(x, 0f, z);
         speed = 0f;
+        down = false;
+        downTimer = 0f;
+        knock.zero();
         pickTarget();
+    }
+
+    public boolean isDown() {
+        return down;
+    }
+
+    /** Knock the pedestrian down, launched along {@code dir} scaled by impact speed. */
+    public void hit(Vector3f dir, float impactSpeed) {
+        if (down) {
+            return;
+        }
+        down = true;
+        downTimer = DOWN_TIME;
+        float k = Math.min(Math.abs(impactSpeed), 22f) * 0.4f;
+        knock.set(dir.x, 0f, dir.z).normalize().mul(k);
     }
 
     private void pickTarget() {
@@ -56,6 +79,19 @@ public class Pedestrian {
      * @param walls        nearby building colliders
      */
     public void update(float dt, Vector3f playerThreat, Vector3f carThreat, AABB[] walls) {
+        if (down) {
+            // Slide from the impact (decaying), then get back up.
+            Collide.slideXZ(pos, RADIUS, knock.x * dt, knock.z * dt, walls);
+            knock.mul((float) Math.pow(0.06, dt));
+            downTimer -= dt;
+            if (downTimer <= 0f) {
+                down = false;
+                pickTarget();
+            }
+            speed = 0f;
+            return;
+        }
+
         Vector3f threat = null;
         float bestSq = Float.MAX_VALUE;
         if (playerThreat != null) {
@@ -101,7 +137,7 @@ public class Pedestrian {
     }
 
     public void render() {
-        avatar.render(pos, facing);
+        avatar.render(pos, facing, down ? (float) (Math.PI / 2.0) : 0f);
     }
 
     private static float distSq(Vector3f a, Vector3f b) {

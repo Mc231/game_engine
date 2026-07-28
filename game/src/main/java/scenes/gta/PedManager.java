@@ -38,14 +38,32 @@ public class PedManager implements Disposable {
         }
     }
 
-    public void update(float dt, Vector3f playerThreat, Vector3f carThreat, Vector3f playerPos) {
+    private static final float HIT_RADIUS = 2.2f;   // car body + ped
+    private static final float HIT_SPEED = 2.5f;    // min car speed to knock a ped down
+
+    /**
+     * @param anchor        position to keep the population around (player or car)
+     * @param carPos        the player's car (for run-over detection)
+     * @param carForward    the car's forward direction (knockback)
+     * @param carSpeed      the car's signed speed
+     */
+    public int update(float dt, Vector3f playerThreat, Vector3f carThreat, Vector3f anchor,
+                      Vector3f carPos, Vector3f carForward, float carSpeed) {
+        boolean carDangerous = Math.abs(carSpeed) > HIT_SPEED;
+        int newHits = 0;
         for (Pedestrian p : peds) {
-            if (distSq(p.pos, playerPos) > DESPAWN * DESPAWN) {
-                freeSpawn(playerPos, spawnPt);
+            if (distSq(p.pos, anchor) > DESPAWN * DESPAWN) {
+                freeSpawn(anchor, spawnPt);
                 p.relocate(spawnPt.x, spawnPt.z);
             }
             p.update(dt, playerThreat, carThreat, city.wallsNear(p.pos, 12f));
+
+            if (carDangerous && !p.isDown() && distSq(p.pos, carPos) < HIT_RADIUS * HIT_RADIUS) {
+                p.hit(carForward, carSpeed);
+                newHits++;
+            }
         }
+        return newHits;
     }
 
     public void render() {

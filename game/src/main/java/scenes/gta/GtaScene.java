@@ -71,6 +71,7 @@ public class GtaScene implements Scene {
     private Vector3f[] lightNodes;      // intersection signal posts
     private Vector3f[] lampPosts;       // decorative street lamps
     private Mode mode = Mode.ON_FOOT;
+    private int pedsHit;
 
     private ThirdPersonController player;
     private OrbitCamera camera;
@@ -193,7 +194,8 @@ public class GtaScene implements Scene {
         Vector3f playerThreat = mode == Mode.ON_FOOT ? player.position() : null;
         Vector3f carThreat = mode == Mode.DRIVING ? car.position() : null;
         Vector3f anchor = mode == Mode.DRIVING ? car.position() : player.position();
-        peds.update(deltaSeconds, playerThreat, carThreat, anchor);
+        pedsHit += peds.update(deltaSeconds, playerThreat, carThreat, anchor,
+                car.position(), car.forward(), car.speed());
         traffic.update(deltaSeconds, peds.positions(), car.position(), lights);
     }
 
@@ -310,7 +312,8 @@ public class GtaScene implements Scene {
                     ? "[F] enter car    WASD move   Shift run" : "WASD move   Shift run   mouse look";
             hud.text(12, 64, 1.7f, hint, 0.75f, 0.85f, 0.9f);
         } else {
-            hud.text(12, 40, 2f, "DRIVING   " + String.format("%.0f", Math.abs(car.speed()) * 3.6f) + " km/h", 1f, 0.9f, 0.7f);
+            hud.text(12, 40, 2f, "DRIVING   " + String.format("%.0f", Math.abs(car.speed()) * 3.6f) + " km/h"
+                    + (pedsHit > 0 ? "     hits " + pedsHit : ""), 1f, 0.9f, 0.7f);
             hud.text(12, 64, 1.7f, "[F] exit    W/S drive   A/D steer   Space brake", 0.85f, 0.85f, 0.8f);
         }
         hud.end();

@@ -89,7 +89,15 @@ public class Avatar implements Disposable {
      * {@link #animate}. Frame uniforms (view/projection/lights) must be set first.
      */
     public void render(Vector3f pos, float facing) {
-        base.identity().translate(pos.x, pos.y + bob, pos.z).rotateY(facing);
+        render(pos, facing, 0f);
+    }
+
+    /**
+     * Draw with an extra tilt about the local X axis (radians) — e.g. ~PI/2 to lay
+     * a knocked-down pedestrian flat on the ground. 0 = standing.
+     */
+    public void render(Vector3f pos, float facing, float tilt) {
+        base.identity().translate(pos.x, pos.y + bob, pos.z).rotateY(facing).rotateX(tilt);
 
         uniformMat.use();
         part(0f, 1.24f, 0f, 0.52f, 0.82f, 0.30f);      // torso

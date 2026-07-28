@@ -78,6 +78,11 @@ public class Vehicle implements Disposable {
         return controller.position();
     }
 
+    /** Unit forward direction (new vector). */
+    public Vector3f forward() {
+        return controller.forward();
+    }
+
     public float heading() {
         return controller.heading();
     }
