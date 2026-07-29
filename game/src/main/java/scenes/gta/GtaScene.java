@@ -256,8 +256,11 @@ public class GtaScene implements Scene {
             if (input.isKeyPressed(GLFW_KEY_F) && car.nearSeat(player.position())) {
                 enterCar();
             }
-            // Hold RMB to aim over-the-shoulder: shift the camera off the character + zoom in.
-            aiming = input.isMouseButtonDown(GLFW_MOUSE_BUTTON_RIGHT);
+            // Toggle over-the-shoulder aim with RMB or Q (a toggle, not hold, so it
+            // works on a trackpad — you can left-click to fire while aiming).
+            if (input.isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT) || input.isKeyPressed(GLFW_KEY_Q)) {
+                aiming = !aiming;
+            }
             camera.setAim(aiming)
                     .setShoulder(aiming ? 1.6f : 0f)
                     .setDistance(aiming ? 4.0f : FOOT_DISTANCE)
@@ -315,6 +318,7 @@ public class GtaScene implements Scene {
 
     private void wasted() {
         mode = Mode.ON_FOOT;
+        aiming = false;
         player.place(city.playerSpawn.x, city.playerSpawn.z, 0f);
         health = 100f;
         wanted.clear();
@@ -499,8 +503,11 @@ public class GtaScene implements Scene {
         if (mode == Mode.ON_FOOT) {
             hud.text(12, 40, 2f, "ON FOOT   health " + String.format("%.0f", health)
                     + "   " + weapon.name() + " " + weapon.ammo(), 0.8f, 0.9f, 1f);
-            String hint = car.nearSeat(player.position())
-                    ? "[F] enter car    LMB shoot  RMB aim    WASD move" : "LMB shoot   RMB aim   WASD move   Shift run";
+            String hint = aiming
+                    ? "AIMING - mouse up/down to aim    LMB shoot    RMB/Q exit aim"
+                    : (car.nearSeat(player.position())
+                        ? "[F] enter car    LMB shoot    RMB/Q aim    WASD move"
+                        : "LMB shoot    RMB/Q aim    WASD move    Shift run");
             hud.text(12, 64, 1.7f, hint, 0.75f, 0.85f, 0.9f);
             // crosshair — tighter red reticle while aiming, faint white otherwise
             float cx = fbw / 2f, cy = fbh / 2f;
