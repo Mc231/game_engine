@@ -2,6 +2,7 @@ package scenes.gta;
 
 import engine.AABB;
 import engine.Audio;
+import engine.Collide;
 import engine.Geometry;
 import engine.Hud;
 import engine.Input;
@@ -334,12 +335,44 @@ public class GtaScene implements Scene {
         camera.setAim(false).setShoulder(0f).setDistance(CAR_DISTANCE).setTargetHeight(CAR_HEIGHT).resetYaw();
     }
 
+    // Candidate exit offsets around the car (right, left, back, front), car-local.
+    private static final float[][] EXIT_SPOTS = {{-2.7f, 0f}, {2.7f, 0f}, {0f, -3.6f}, {0f, 3.6f}};
+
     private void exitCar() {
         mode = Mode.ON_FOOT;
-        car.worldExit(tmp);
-        player.place(tmp.x, tmp.z, car.heading() + (float) (Math.PI / 2.0));   // face away from the door
+        aiming = false;
+
+        // Pick the first exit spot that isn't inside a building so the driver never
+        // steps out stuck in a wall (e.g. when parked hard against one).
+        float ex = 0f, ez = 0f;
+        boolean found = false;
+        for (float[] s : EXIT_SPOTS) {
+            car.worldPoint(s[0], s[1], tmp);
+            if (!blockedAt(tmp.x, tmp.z)) {
+                ex = tmp.x; ez = tmp.z; found = true;
+                break;
+            }
+        }
+        if (!found) {
+            car.worldExit(tmp);
+            ex = tmp.x; ez = tmp.z;
+        }
+        player.place(ex, ez, car.heading() + (float) (Math.PI / 2.0));   // face away from the door
+        // Safety net: eject the body out of any building it still overlaps.
+        Collide.resolveCircle(player.position(), 0.45f, city.wallsNear(player.position(), 4f));
+
         avatar.animate(0f, 0f);
-        camera.setDistance(FOOT_DISTANCE).setTargetHeight(FOOT_HEIGHT).resetYaw();
+        camera.setAim(false).setShoulder(0f).setDistance(FOOT_DISTANCE).setTargetHeight(FOOT_HEIGHT).resetYaw();
+    }
+
+    /** True if (x,z) sits inside (or within a body radius of) a nearby building. */
+    private boolean blockedAt(float x, float z) {
+        for (AABB b : city.wallsNear(x, z, 2f)) {
+            if (x >= b.min.x - 0.5f && x <= b.max.x + 0.5f && z >= b.min.z - 0.5f && z <= b.max.z + 0.5f) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

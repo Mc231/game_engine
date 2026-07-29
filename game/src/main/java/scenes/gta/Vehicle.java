@@ -57,15 +57,18 @@ public class Vehicle implements Disposable {
         return dx * dx + dz * dz <= enterRadius * enterRadius;
     }
 
-    /** World position where the driver should appear when leaving the car. */
-    public Vector3f worldExit(Vector3f dest) {
+    /** World position of a car-local offset (lx = right, lz = forward). */
+    public Vector3f worldPoint(float lx, float lz, Vector3f dest) {
         float h = controller.heading();
         float sin = (float) Math.sin(h), cos = (float) Math.cos(h);
         // rotateY(h) applied to (lx,0,lz): (lx*cos + lz*sin, 0, -lx*sin + lz*cos)
-        float wx = exitLocal.x * cos + exitLocal.z * sin;
-        float wz = -exitLocal.x * sin + exitLocal.z * cos;
         Vector3f c = controller.position();
-        return dest.set(c.x + wx, 0f, c.z + wz);
+        return dest.set(c.x + lx * cos + lz * sin, 0f, c.z - lx * sin + lz * cos);
+    }
+
+    /** World position where the driver should appear when leaving the car (driver-side default). */
+    public Vector3f worldExit(Vector3f dest) {
+        return worldPoint(exitLocal.x, exitLocal.z, dest);
     }
 
     public Matrix4f matrix() {
