@@ -5,6 +5,13 @@ public class Economy {
 
     private int money;
 
+    public Economy() {
+    }
+
+    public Economy(int start) {
+        this.money = start;
+    }
+
     public void add(int amount) {
         money += amount;
     }

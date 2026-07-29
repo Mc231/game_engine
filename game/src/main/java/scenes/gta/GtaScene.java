@@ -51,7 +51,6 @@ public class GtaScene implements Scene {
     private final ResourceManager resources = new ResourceManager();
     // Fog / horizon.
     private static final float FOG_DENSITY = 0.006f;
-    private final Vector3f fogColor = new Vector3f(0.62f, 0.70f, 0.80f);
     // Street-furniture placement offsets (≈ half the road width).
     private static final float LIGHT_CORNER = 5.5f, LAMP_SIDE = 5.5f;
 
@@ -96,6 +95,13 @@ public class GtaScene implements Scene {
     private float rewardFlash;
     private int lastReward;
 
+    // Polish: day/night, minimap, audio, save.
+    private DayNightCycle dayNight;
+    private Minimap minimap;
+    private Sound cash;
+    private Sound siren;
+    private float sirenTimer;
+
     private ThirdPersonController player;
     private OrbitCamera camera;
     private Input input;
@@ -105,7 +111,6 @@ public class GtaScene implements Scene {
 
     private final Light[] worldLights = new Light[2];
     private final Vector3f lightDir = new Vector3f(-0.4f, -1f, -0.3f).normalize();
-    private final Vector3f lightColor = new Vector3f(1f, 0.97f, 0.9f);
     private final Matrix4f projection = new Matrix4f();
     private final Matrix4f identity = new Matrix4f();
     private final Matrix4f model = new Matrix4f();
@@ -158,8 +163,16 @@ public class GtaScene implements Scene {
         gunshot = new Sound("sounds/gunshot.wav");
         wanted = new WantedSystem();
         police = new PoliceManager(litShader, white, city, gunshot);
-        economy = new Economy();
+
+        SaveGame.State saved = SaveGame.load();
+        economy = new Economy(saved.money);
         missions = new MissionManager(city, economy);
+        missions.markCompleted(saved.completed);
+
+        dayNight = new DayNightCycle(150f, 0.32f);   // ~2.5 min cycle, start mid-morning
+        minimap = new Minimap();
+        cash = new Sound("sounds/cash.wav");
+        siren = new Sound("sounds/siren.wav");
 
         projection.identity().perspective((float) Math.toRadians(65.0), window.aspectRatio(), 0.1f, 600f);
     }
@@ -208,6 +221,16 @@ public class GtaScene implements Scene {
     @Override
     public void update(float deltaSeconds) {
         lights.update(deltaSeconds);
+        dayNight.update(deltaSeconds);
+        if (wanted.wanted()) {
+            sirenTimer -= deltaSeconds;
+            if (sirenTimer <= 0f) {
+                siren.play();
+                sirenTimer = 1.1f;
+            }
+        } else {
+            sirenTimer = 0f;
+        }
         if (flashTimer > 0f) flashTimer -= deltaSeconds;
         if (wastedFlash > 0f) wastedFlash -= deltaSeconds;
         if (rewardFlash > 0f) rewardFlash -= deltaSeconds;
@@ -275,6 +298,8 @@ public class GtaScene implements Scene {
         if (reward > 0) {
             lastReward = reward;
             rewardFlash = 3.5f;
+            cash.play();
+            SaveGame.save(economy.money(), missions.completedNames());
         }
     }
 
@@ -310,7 +335,12 @@ public class GtaScene implements Scene {
 
     @Override
     public void render() {
-        glClearColor(fogColor.x, fogColor.y, fogColor.z, 1f);
+        Vector3f sky = dayNight.skyColor();
+        Vector3f sun = dayNight.sunDir();
+        Vector3f sunColor = dayNight.lightColor();
+        worldLights[0] = Light.directional(sun, sunColor);   // the moving sun
+
+        glClearColor(sky.x, sky.y, sky.z, 1f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         Matrix4f view = camera.viewMatrix();
 
@@ -319,7 +349,7 @@ public class GtaScene implements Scene {
         litShader.setUniform("uProjection", projection);
         litShader.setUniform("uView", view);
         litShader.setUniform("uViewPos", camera.position());
-        litShader.setUniform("uFogColor", fogColor);
+        litShader.setUniform("uFogColor", sky);
         litShader.setUniform("uFogDensity", FOG_DENSITY);
         litShader.setUniform("uLightCount", worldLights.length);
         for (int i = 0; i < worldLights.length; i++) worldLights[i].apply(litShader, "uLights[" + i + "]");
@@ -349,11 +379,11 @@ public class GtaScene implements Scene {
         cityShader.setUniform("uProjection", projection);
         cityShader.setUniform("uView", view);
         cityShader.setUniform("uViewPos", camera.position());
-        cityShader.setUniform("uFogColor", fogColor);
+        cityShader.setUniform("uFogColor", sky);
         cityShader.setUniform("uFogDensity", FOG_DENSITY);
-        cityShader.setUniform("uLightDir", lightDir);
-        cityShader.setUniform("uLightColor", lightColor);
-        cityShader.setUniform("uAmbient", 0.45f);
+        cityShader.setUniform("uLightDir", sun);
+        cityShader.setUniform("uLightColor", sunColor);
+        cityShader.setUniform("uAmbient", dayNight.ambient());
         cityShader.setUniform("uTexture", 0);
 
         concreteTex.bind(0);
@@ -369,6 +399,10 @@ public class GtaScene implements Scene {
         }
 
         renderHud();
+
+        Vector3f here = mode == Mode.DRIVING ? car.position() : player.position();
+        minimap.render(window.framebufferWidth(), window.framebufferHeight(),
+                city, here, police.positions(), missions);
     }
 
     /** Signal posts at intersections (colored by phase) + decorative street lamps. */
@@ -420,7 +454,7 @@ public class GtaScene implements Scene {
         int fbw = window.framebufferWidth();
         int fbh = window.framebufferHeight();
         hud.begin(fbw, fbh);
-        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 6 (missions)", 1f, 1f, 1f);
+        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  v0.4", 1f, 1f, 1f);
 
         int stars = wanted.stars();
         if (stars > 0) {
@@ -474,10 +508,14 @@ public class GtaScene implements Scene {
         propCube.dispose();
         avatar.dispose();
         car.dispose();
+        SaveGame.save(economy.money(), missions.completedNames());
         peds.dispose();
         traffic.dispose();
         police.dispose();
+        minimap.dispose();
         gunshot.dispose();
+        cash.dispose();
+        siren.dispose();
         audio.destroy();
         hud.dispose();
         resources.dispose();

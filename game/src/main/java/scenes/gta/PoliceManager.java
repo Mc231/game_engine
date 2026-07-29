@@ -125,6 +125,17 @@ public class PoliceManager implements Disposable {
         }
     }
 
+    /** Live officer positions (for the minimap). */
+    public List<Vector3f> positions() {
+        List<Vector3f> out = new ArrayList<>();
+        for (Police p : officers) {
+            if (!p.isDead()) {
+                out.add(p.pos);
+            }
+        }
+        return out;
+    }
+
     /** Remove all officers (e.g. on bust / respawn). */
     public void clearAll() {
         for (Police p : officers) {

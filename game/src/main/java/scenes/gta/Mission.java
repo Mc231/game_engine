@@ -36,6 +36,11 @@ public class Mission {
         index = 0;
     }
 
+    /** Force-complete (e.g. restoring a save). */
+    public void markComplete() {
+        state = State.COMPLETE;
+    }
+
     /** Advance if the current objective is reached; returns true the frame it completes. */
     public boolean update(Vector3f pos) {
         if (state != State.ACTIVE) {

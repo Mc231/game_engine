@@ -15,7 +15,7 @@ code as it actually exists. Phases are ordered so the game is fun and runnable a
 | 4 | Combat & weapons | Combat | v0.3 | 🔨 built — playtest |
 | 5 | Wanted level & police | Combat/police | **v0.3** | 🔨 built — **v0.3**, playtest |
 | 6 | Missions & money | Progression | v0.4 | 🔨 built — playtest |
-| 7 | Polish (minimap, day/night, audio, save) | — | **v0.4** | ⬜ |
+| 7 | Polish (minimap, day/night, audio, save) | — | **v0.4** | 🔨 built — **v0.4 reached** 🎉 |
 
 Status legend: ⬜ not started · 📝 spec written · 🔨 building · ✅ done.
 

@@ -78,6 +78,26 @@ public class MissionManager {
         return active;
     }
 
+    /** Names of completed missions (for saving). */
+    public java.util.Set<String> completedNames() {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (Mission m : missions) {
+            if (m.state() == Mission.State.COMPLETE) {
+                out.add(m.name);
+            }
+        }
+        return out;
+    }
+
+    /** Mark missions complete by name (for restoring a save). */
+    public void markCompleted(java.util.Set<String> names) {
+        for (Mission m : missions) {
+            if (names.contains(m.name)) {
+                m.markComplete();
+            }
+        }
+    }
+
     /** An available mission whose start marker the player is standing in (for the HUD prompt). */
     public Mission nearAvailable(Vector3f pos) {
         if (active != null) {
