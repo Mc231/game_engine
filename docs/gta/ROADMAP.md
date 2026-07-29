@@ -14,7 +14,7 @@ code as it actually exists. Phases are ordered so the game is fun and runnable a
 | 3 | Street life (peds + traffic + lights) | Open city + life | **v0.2** | 🔨 built (3a–3c + dressing) — **v0.2**, playtest |
 | 4 | Combat & weapons | Combat | v0.3 | 🔨 built — playtest |
 | 5 | Wanted level & police | Combat/police | **v0.3** | 🔨 built — **v0.3**, playtest |
-| 6 | Missions & money | Progression | v0.4 | ⬜ |
+| 6 | Missions & money | Progression | v0.4 | 🔨 built — playtest |
 | 7 | Polish (minimap, day/night, audio, save) | — | **v0.4** | ⬜ |
 
 Status legend: ⬜ not started · 📝 spec written · 🔨 building · ✅ done.

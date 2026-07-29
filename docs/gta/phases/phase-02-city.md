@@ -1,4 +1,4 @@
-# Phase 2 — Procedural city  → **v0.2** (part 1)
+claud# Phase 2 — Procedural city  → **v0.2** (part 1)
 
 **Milestone:** starts v0.2 · **Status:** 🔨 built (2a–2c) — awaiting playtest · **Pillar:** Open city
 

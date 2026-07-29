@@ -90,6 +90,12 @@ public class GtaScene implements Scene {
     private float damagedTimer;   // suppresses health regen after being shot
     private float wastedFlash;
 
+    // Missions + money.
+    private Economy economy;
+    private MissionManager missions;
+    private float rewardFlash;
+    private int lastReward;
+
     private ThirdPersonController player;
     private OrbitCamera camera;
     private Input input;
@@ -152,6 +158,8 @@ public class GtaScene implements Scene {
         gunshot = new Sound("sounds/gunshot.wav");
         wanted = new WantedSystem();
         police = new PoliceManager(litShader, white, city, gunshot);
+        economy = new Economy();
+        missions = new MissionManager(city, economy);
 
         projection.identity().perspective((float) Math.toRadians(65.0), window.aspectRatio(), 0.1f, 600f);
     }
@@ -202,6 +210,7 @@ public class GtaScene implements Scene {
         lights.update(deltaSeconds);
         if (flashTimer > 0f) flashTimer -= deltaSeconds;
         if (wastedFlash > 0f) wastedFlash -= deltaSeconds;
+        if (rewardFlash > 0f) rewardFlash -= deltaSeconds;
         camera.addLook(input.mouseDeltaX(), input.mouseDeltaY());
 
         if (mode == Mode.ON_FOOT) {
@@ -260,6 +269,13 @@ public class GtaScene implements Scene {
             health = Math.min(100f, health + 7f * deltaSeconds);   // slow regen when clean
         }
         if (health <= 0f) wasted();
+
+        // Missions (use the same active position as the police target).
+        int reward = missions.update(target);
+        if (reward > 0) {
+            lastReward = reward;
+            rewardFlash = 3.5f;
+        }
     }
 
     private void wasted() {
@@ -321,6 +337,7 @@ public class GtaScene implements Scene {
         peds.render();
         police.render();
         renderStreetFurniture();
+        renderMissionMarkers();
 
         if (flashTimer > 0f) {   // muzzle flash
             lampMat.use();
@@ -370,6 +387,24 @@ public class GtaScene implements Scene {
         for (Vector3f p : lampPosts) lamp(p.x, 4.1f, p.z, warm);
     }
 
+    /** Glowing pillars: gold for available mission starts, green for the current objective. */
+    private void renderMissionMarkers() {
+        lampMat.use();
+        for (Vector3f s : missions.availableStarts()) {
+            marker(s.x, s.z, tmp.set(1f, 0.82f, 0.2f));
+        }
+        Mission m = missions.active();
+        if (m != null && m.current() != null) {
+            marker(m.current().pos.x, m.current().pos.z, tmp.set(0.3f, 1f, 0.4f));
+        }
+    }
+
+    private void marker(float x, float z, Vector3f color) {
+        litShader.setUniform("uTint", color);
+        litShader.setUniform("uModel", model.identity().translate(x, 4f, z).scale(0.7f, 8f, 0.7f));
+        propCube.render();
+    }
+
     private void pole(float x, float z) {
         litShader.setUniform("uModel", model.identity().translate(x, 2.2f, z).scale(0.22f, 4.4f, 0.22f));
         propCube.render();
@@ -385,7 +420,7 @@ public class GtaScene implements Scene {
         int fbw = window.framebufferWidth();
         int fbh = window.framebufferHeight();
         hud.begin(fbw, fbh);
-        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 5 (wanted)", 1f, 1f, 1f);
+        hud.text(12, 12, 2.2f, "GRAND THEFT LWJGL  -  Phase 6 (missions)", 1f, 1f, 1f);
 
         int stars = wanted.stars();
         if (stars > 0) {
@@ -395,6 +430,26 @@ public class GtaScene implements Scene {
         }
         if (wastedFlash > 0f) {
             hud.text(fbw / 2f - 120f, fbh / 2f - 60f, 5f, "WASTED", 1f, 0.25f, 0.2f);
+        }
+
+        // Money + mission status.
+        hud.text(fbw - 220f, 44f, 2.6f, "$" + economy.money(), 0.5f, 1f, 0.5f);
+        Vector3f here = mode == Mode.DRIVING ? car.position() : player.position();
+        Mission m = missions.active();
+        if (m != null && m.current() != null) {
+            float ox = here.x - m.current().pos.x, oz = here.z - m.current().pos.z;
+            float d = (float) Math.sqrt(ox * ox + oz * oz);
+            hud.text(12, fbh - 60f, 2f, m.name + " (" + m.step() + "/" + m.steps() + "):  "
+                    + m.current().label + "  " + String.format("%.0f", d) + "m", 1f, 0.95f, 0.5f);
+        } else {
+            Mission near = missions.nearAvailable(here);
+            if (near != null) {
+                hud.text(12, fbh - 60f, 2f, "MISSION: " + near.name + "  ($" + near.reward + ") - stand here",
+                        1f, 0.85f, 0.4f);
+            }
+        }
+        if (rewardFlash > 0f) {
+            hud.text(fbw / 2f - 160f, fbh / 2f + 40f, 3.5f, "MISSION COMPLETE  +$" + lastReward, 0.5f, 1f, 0.5f);
         }
         if (mode == Mode.ON_FOOT) {
             hud.text(12, 40, 2f, "ON FOOT   health " + String.format("%.0f", health)
