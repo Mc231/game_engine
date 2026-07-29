@@ -27,7 +27,8 @@ public class Pedestrian {
     private final Vector3f dir = new Vector3f();
     private final Vector3f knock = new Vector3f();   // knockback velocity while down
     private float facing;
-    private float speed;
+    private float animSpeed;      // smoothed speed that drives the walk animation (no per-frame jitter)
+    private float blockedTimer;   // how long we've been unable to make progress (→ re-path)
     private boolean down;
     private boolean dead;
     private float downTimer;
@@ -47,7 +48,8 @@ public class Pedestrian {
     /** Send the pedestrian to a fresh spot (population recycling). */
     public void relocate(float x, float z) {
         pos.set(x, 0f, z);
-        speed = 0f;
+        animSpeed = 0f;
+        blockedTimer = 0f;
         down = false;
         dead = false;
         downTimer = 0f;
@@ -124,7 +126,7 @@ public class Pedestrian {
                 down = false;
                 pickTarget();
             }
-            speed = 0f;
+            animSpeed = 0f;
             return;
         }
 
@@ -157,19 +159,34 @@ public class Pedestrian {
         }
 
         float len = dir.length();
+        float intended = 0f;
         if (len > 1e-4f) {
             dir.div(len);
             Vector3f before = new Vector3f(pos);
             Collide.slideXZ(pos, RADIUS, dir.x * sp * dt, dir.z * sp * dt, walls);
-            speed = pos.distance(before) / Math.max(dt, 1e-4f);
+            float moved = pos.distance(before) / Math.max(dt, 1e-4f);
+            intended = sp;
+
+            // Blocked by a building? Steer somewhere new instead of grinding the wall.
+            if (moved < sp * 0.3f) {
+                blockedTimer += dt;
+                if (blockedTimer > 0.35f) {
+                    pickTarget();
+                    blockedTimer = 0f;
+                }
+            } else {
+                blockedTimer = 0f;
+            }
+
             float want = (float) Math.atan2(dir.x, dir.z);
             float da = (float) Math.atan2(Math.sin(want - facing), Math.cos(want - facing));
             facing += da * Math.min(dt * 10f, 1f);
-        } else {
-            speed = 0f;
         }
 
-        avatar.animate(speed, dt);
+        // Drive the animation from a smoothed *intended* speed so wall contact
+        // (which zeroes the measured speed for a frame) doesn't make the legs stutter.
+        animSpeed += (intended - animSpeed) * Math.min(dt * 8f, 1f);
+        avatar.animate(animSpeed, dt);
     }
 
     public void render() {

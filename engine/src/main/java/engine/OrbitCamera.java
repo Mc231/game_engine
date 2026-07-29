@@ -35,6 +35,7 @@ public class OrbitCamera {
     private float minDistance = 1.2f;
     private float sensitivity = 0.005f;   // radians per pixel
     private float targetHeight = 1.4f;    // look at target + this height (chest)
+    private float shoulder = 0f;          // lateral offset of the look point (over-the-shoulder aim)
     private float collisionMargin = 0.35f;
     private float followLerp = 12f;       // higher = snappier follow
 
@@ -61,6 +62,11 @@ public class OrbitCamera {
      */
     public void update(Vector3f target, float dt, AABB[] walls) {
         lookAt.set(target.x, target.y + targetHeight, target.z);
+        if (shoulder != 0f) {                 // shift the look point sideways (over-the-shoulder aim)
+            Vector3f r = rightXZ();
+            lookAt.x += r.x * shoulder;
+            lookAt.z += r.z * shoulder;
+        }
 
         float a = yaw + baseYaw;
         float cp = (float) Math.cos(pitch);
@@ -146,6 +152,12 @@ public class OrbitCamera {
 
     public OrbitCamera setTargetHeight(float targetHeight) {
         this.targetHeight = targetHeight;
+        return this;
+    }
+
+    /** Lateral offset of the look point along camera-right (0 = centered; used for aim mode). */
+    public OrbitCamera setShoulder(float shoulder) {
+        this.shoulder = shoulder;
         return this;
     }
 

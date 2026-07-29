@@ -19,6 +19,9 @@ import org.joml.Vector3f;
  */
 public class Vehicle implements Disposable {
 
+    /** The CC0 car is ~1.1 tall / 2.55 long at scale 1 — half a person. Scale it up to read as a car. */
+    public static final float MODEL_SCALE = 1.8f;
+
     private final Model model;
     private final CarController controller = new CarController();
     private final float enterRadius;
@@ -34,8 +37,8 @@ public class Vehicle implements Disposable {
         controller.setPosition(startX, 0f, startZ).setHeading(headingRad);
     }
 
-    /** Body radius used for arcade collision against buildings. */
-    private static final float BODY_RADIUS = 1.5f;
+    /** Body radius used for arcade collision against buildings (scaled car ≈ 2.3 wide / 4.6 long). */
+    private static final float BODY_RADIUS = 2.0f;
 
     /** Advance the driving simulation (inputs already resolved to -1..1 / brake). */
     public void update(float dt, float throttle, float steer, boolean brake) {
@@ -67,7 +70,7 @@ public class Vehicle implements Disposable {
 
     public Matrix4f matrix() {
         Vector3f c = controller.position();
-        return matrix.identity().translate(c).rotateY(controller.heading());
+        return matrix.identity().translate(c).rotateY(controller.heading()).scale(MODEL_SCALE);
     }
 
     public void render() {

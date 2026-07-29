@@ -17,11 +17,11 @@ import java.util.Random;
  */
 public class TrafficCar {
 
-    private static final float BODY_RADIUS = 1.5f;
+    private static final float BODY_RADIUS = 2.0f;
     private static final float ARRIVE = 3.5f;
     // Forward zone in which a pedestrian/car makes this car brake.
-    private static final float BRAKE_DIST = 7.5f;
-    private static final float BRAKE_HALF_WIDTH = 2.2f;
+    private static final float BRAKE_DIST = 8.5f;
+    private static final float BRAKE_HALF_WIDTH = 2.6f;
     private final Vector3f fwd = new Vector3f();
 
     private final CarController ctrl = new CarController()
@@ -136,6 +136,6 @@ public class TrafficCar {
 
     public Matrix4f matrix() {
         Vector3f p = ctrl.position();
-        return matrix.identity().translate(p).rotateY(ctrl.heading());
+        return matrix.identity().translate(p).rotateY(ctrl.heading()).scale(Vehicle.MODEL_SCALE);
     }
 }

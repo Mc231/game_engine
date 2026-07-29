@@ -20,7 +20,7 @@ public class Police {
     private final Vector3f dir = new Vector3f();
     private final Weapon gun = new Weapon("SIDEARM", 1.4f, 11f, 26f, Integer.MAX_VALUE);
     private float facing;
-    private float speed;
+    private float animSpeed;   // smoothed, so wall contact doesn't stutter the walk
     private float health = 100f;
     private boolean dead;
     private float deadTimer;
@@ -54,7 +54,7 @@ public class Police {
         gun.update(dt);
         if (dead) {
             deadTimer -= dt;
-            speed = 0f;
+            animSpeed = 0f;
             avatar.animate(0f, dt);
             return 0f;
         }
@@ -68,17 +68,15 @@ public class Police {
         }
 
         float damage = 0f;
+        float intended = 0f;
         if (dist > STOP_RANGE) {
-            Vector3f before = new Vector3f(pos);
             Collide.slideXZ(pos, RADIUS, dir.x * RUN_SPEED * dt, dir.z * RUN_SPEED * dt, walls);
-            speed = pos.distance(before) / Math.max(dt, 1e-4f);
-        } else {
-            speed = 0f;
-            if (hasLoS && gun.tryFire()) {
-                damage = gun.damage();
-            }
+            intended = RUN_SPEED;
+        } else if (hasLoS && gun.tryFire()) {
+            damage = gun.damage();
         }
-        avatar.animate(speed, dt);
+        animSpeed += (intended - animSpeed) * Math.min(dt * 8f, 1f);
+        avatar.animate(animSpeed, dt);
         return damage;
     }
 

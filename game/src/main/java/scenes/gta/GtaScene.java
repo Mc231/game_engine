@@ -137,7 +137,7 @@ public class GtaScene implements Scene {
 
         avatar = new Avatar(litShader, white, Avatar.civilian());
         Model carModel = Model.load("models/car/car.obj", litShader, resources);
-        car = new Vehicle(carModel, city.carSpawn.x, city.carSpawn.z, city.carHeading, 3.6f, new Vector3f(-1.9f, 0f, 0f));
+        car = new Vehicle(carModel, city.carSpawn.x, city.carSpawn.z, city.carHeading, 4.2f, new Vector3f(-2.7f, 0f, 0f));
         peds = new PedManager(litShader, white, city, 40, 99L);
         traffic = new TrafficManager(litShader, resources, city, 14, 7L);
 
@@ -252,6 +252,11 @@ public class GtaScene implements Scene {
             if (input.isKeyPressed(GLFW_KEY_F) && car.nearSeat(player.position())) {
                 enterCar();
             }
+            // Hold RMB to aim over-the-shoulder: shift the camera off the character + zoom in.
+            boolean aiming = input.isMouseButtonDown(GLFW_MOUSE_BUTTON_RIGHT);
+            camera.setShoulder(aiming ? 1.3f : 0f)
+                    .setDistance(aiming ? 4.2f : FOOT_DISTANCE)
+                    .setTargetHeight(aiming ? 1.55f : FOOT_HEIGHT);
             camera.setBaseYaw(0f);
             camera.update(player.position(), deltaSeconds, near);
         } else { // DRIVING
@@ -316,7 +321,7 @@ public class GtaScene implements Scene {
 
     private void enterCar() {
         mode = Mode.DRIVING;
-        camera.setDistance(CAR_DISTANCE).setTargetHeight(CAR_HEIGHT).resetYaw();
+        camera.setShoulder(0f).setDistance(CAR_DISTANCE).setTargetHeight(CAR_HEIGHT).resetYaw();
     }
 
     private void exitCar() {
@@ -489,7 +494,7 @@ public class GtaScene implements Scene {
             hud.text(12, 40, 2f, "ON FOOT   health " + String.format("%.0f", health)
                     + "   " + weapon.name() + " " + weapon.ammo(), 0.8f, 0.9f, 1f);
             String hint = car.nearSeat(player.position())
-                    ? "[F] enter car    LMB shoot    WASD move   Shift run" : "LMB shoot    WASD move   Shift run";
+                    ? "[F] enter car    LMB shoot  RMB aim    WASD move" : "LMB shoot   RMB aim   WASD move   Shift run";
             hud.text(12, 64, 1.7f, hint, 0.75f, 0.85f, 0.9f);
             // crosshair
             float cx = fbw / 2f, cy = fbh / 2f;

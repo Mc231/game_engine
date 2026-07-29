@@ -34,7 +34,7 @@ public class TrafficManager implements Disposable {
         }
     }
 
-    private static final float CAR_SEPARATION = 3.4f;
+    private static final float CAR_SEPARATION = 4.2f;
 
     /**
      * @param pedPositions   pedestrian positions (traffic brakes for them)

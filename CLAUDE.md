@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A small 3D game engine built on **LWJGL 3.3.4** (OpenGL + GLFW) with **JOML** for math, plus a set of demo scenes that exercise it. Java 17, Gradle **multi-module**: the reusable engine is the `:engine` module (a `java-library`); the runnable game/demos are the `:game` module (an `application` that depends on `:engine`). The module boundary is compile-enforced — engine code cannot import game code.
+A small 3D game engine built on **LWJGL 3.3.4** (OpenGL + GLFW) with **JOML** for math, and **the game built on it: Grand Theft LWJGL** (codename MiniCity) — a small third-person open-world GTA-style game. Java 17, Gradle **multi-module**: the reusable engine is the `:engine` module (a `java-library`); the runnable game is the `:game` module (an `application` that depends on `:engine`). The module boundary is compile-enforced — engine code cannot import game code.
+
+The game lives in **`game/src/main/java/scenes/gta/`** and is the single registered scene (`GtaScene`). It's built in phases documented under **`docs/gta/`** (`VISION.md`, `ROADMAP.md`, `phases/`). The old tutorial/demo scenes were removed; the engine still contains reusable features they used (`Terrain`, `Road`, `Skybox`, `PostProcessor`, `ShadowMap`, `SceneSerializer`, …), available even though the current game doesn't use all of them.
 
 ## Build & run
 
@@ -29,11 +31,10 @@ Unit tests (in `:engine`) cover the **pure-logic** classes only — no OpenGL co
 
 A successful launch that stays open means shaders compiled, resources loaded, and framebuffers are complete. Scenes create all their GPU resources in `init()`, so a broken scene throws there and exits immediately.
 
-**Testing a specific scene from the CLI:** the app opens a GUI window and blocks until closed. To verify a scene non-interactively, temporarily make it the **first** entry in the scene list in `game/src/main/java/Main.java` (only the current scene's `init()` runs), then:
+**Verifying non-interactively:** the app opens a GUI window and blocks until closed. `GtaScene` is the only registered scene, so `./gradlew run` launches straight into it (no scene-switching needed). To verify it stays open:
 ```bash
 timeout 10 ./gradlew run --console=plain; echo "exit=$?"   # exit=124 (timed out = stayed open) means success
 ```
-Restore the list order afterward.
 
 ### Running from the IDE (macOS)
 
@@ -48,7 +49,7 @@ Do **not** use the green-arrow "run `main()`" — on macOS it fails with exit 1 
 Two Gradle modules:
 
 - **`:engine`** (`engine/src/main/java/engine/`) — the reusable engine library. Depends on nothing in the game; the module boundary makes an engine→game import a compile error.
-- **`:game`** (`game/src/main/java/`) — depends on `:engine`. Contains `Main` (default package; the entry point, which uses `Application.create()…scene(…)…run()` to configure the window and register scenes), the `scenes/` package (one class per demo, each implementing `engine.Scene`), and the resources.
+- **`:game`** (`game/src/main/java/`) — depends on `:engine`. Contains `Main` (default package; the entry point, which uses `Application.create()…scene(new GtaScene()).run()` to configure the window and launch the game), the **`scenes.gta`** package (the whole game: `GtaScene` + `City`/`CityGenerator`, `Avatar`/`ThirdPersonController`/`Vehicle`/`TrafficCar`, `Pedestrian`/`Police` + managers, `Weapon`/`WantedSystem`, `Mission`/`Economy`, `Minimap`/`DayNightCycle`/`SaveGame`, …), and the resources. Note: `:game` has **no test source set** — game logic is currently not unit-tested; the pure/testable logic lives in `:engine` and is covered there.
 
 ### The core loop and scene model
 
@@ -91,7 +92,7 @@ Beyond the direct `GameObject`+`Mesh` approach, the engine has a small ECS: `Ent
 - **`InstancedMesh`** — one mesh drawn many times via `glDrawElementsInstanced` with a per-instance `mat4` attribute at locations `base..base+3` (base = the count of the mesh's own attributes, e.g. 3 for `{3,3,2}`); the shader declares `layout(location=3) in mat4 aInstance`.
 - `SkyboxScene` combines all three (instanced field under a sky, rendered through a post effect).
 - **MSAA** — `WindowConfig.samples` (default 4) requests a multisampled window (`GLFW_SAMPLES`); `Engine` enables `GL_MULTISAMPLE`. This smooths edges on the default framebuffer (note: it does NOT apply to the offscreen `Framebuffer` used by `PostProcessor`).
-- **Distance fog** — `lit.frag` has optional exponential fog via `uFogColor` + `uFogDensity` (density 0 = off, so scenes that don't set it are unaffected). `DrivingScene` uses it (plus fog in its tree shader and the terrain shader) so the world fades into the skybox horizon.
+- **Distance fog** — `lit.frag` (and the game's `city.frag`) have optional exponential fog via `uFogColor` + `uFogDensity` (density 0 = off). The game drives the fog color from its `DayNightCycle` so the city fades into a sky-matched horizon.
 
 ### Tooling / pipeline
 
@@ -106,9 +107,17 @@ Beyond the direct `GameObject`+`Mesh` approach, the engine has a small ECS: `Ent
 - **`AABB` / `Ray` / `Intersect`** — pure collision math (ray-AABB slab test, AABB overlap, ray-plane); `PhysicsScene` raycasts from the camera to pick cubes.
 - **Normal mapping** — `Geometry.cubeWithTangents()` (layout `{3,3,2,3}`) + `shaders/normalmap.*` (TBN, tangent-space normals). **Transparency** — alpha blend with `glDepthMask(false)` and back-to-front sorting (see `NormalMapScene`).
 
-### The driving game (`DrivingScene`)
+### The game — Grand Theft LWJGL (`scenes.gta`)
 
-`DrivingScene` is a small game built on the engine: **`CarController`** (arcade driving physics — throttle/steer/brake, ground-clamped to a height field; pure + unit-tested, `forward = (sin h, 0, cos h)`, heading 0 → +Z) + **`Road`** (`loop` = oval, or `spline` = curvy Catmull-Rom track through waypoints; both conform to terrain height) + **`Scatter`** (random instance transforms over the terrain, with an exclude region to keep trees off the road) + a `Skybox` and an `InstancedMesh` forest + a mouse-orbit chase camera. Trees are a CC0 Kenney model whose per-material `Kd` colors are baked into per-vertex colors (`buildForest`) so the whole forest draws in one instanced call. It's a **time trial**: `Road.centerline(...)` gives the sampled track path; each frame the scene finds the nearest centerline point → distance beyond `OFF_TRACK` triggers `crash()` (respawn at the start, lap timer reset), and the nearest-point index drives lap detection (pass the halfway index, then return near index 0 → a completed lap, tracking the best time). The car is a **third-party CC0 model** (Kenney "Car Kit") at `game/src/main/resources/models/car/` (`car.obj` + `colormap.png`, see `CREDITS.txt`) — it loads through the existing `Model`/`MtlLoader` (standard `v/vt/vn` OBJ + `map_Kd` texture; the extra per-vertex color floats on `v` lines are ignored). Note `MODEL_YAW_OFFSET` in the scene flips the model 180° if a downloaded car faces the other way. New game assets/models go under `game/src/main/resources/`; keep third-party assets CC0/permissive and record provenance in a `CREDITS.txt`.
+The whole game is `GtaScene` + the `scenes.gta` package, built in phases (see **`docs/gta/`** — read `VISION.md`/`ROADMAP.md` before large changes so new work fits the plan). It's a third-person, stylized low-poly open-world crime sandbox:
+
+- **On foot & vehicles:** `ThirdPersonController` (camera-relative walk + wall-slide) + the animated `Avatar` (procedural walk from primitives — the engine has no skeletal animation); `Vehicle` wraps the CC0 Kenney car `Model` + `CarController` with an enter/exit state machine (`engine.OrbitCamera` chase cam serves both modes). The car model is scaled up (`Vehicle.MODEL_SCALE`) to read as a real car next to the ~2m avatars.
+- **Procedural city:** `CityGenerator`/`City` — a grid of streets, sidewalks, and instanced box buildings with one collider each, bucketed into an `engine.SpatialGrid` broad-phase; `shaders/city.*` is an instanced biplanar shader. Car-vs-building uses `engine.Collide.resolveCircle`.
+- **Street life:** `Pedestrian`/`PedManager` (wander/flee, run-over knockdown), `TrafficCar`/`TrafficManager` (drive the road-node grid, brake for hazards, obey `TrafficLights`).
+- **Combat & police:** `Weapon` (hitscan via `Ray`/`Intersect`), ped/police health + hit reactions, `WantedSystem` (heat→stars), `Police`/`PoliceManager` (chase + shoot via `Vision`), player health + WASTED respawn.
+- **Progression & polish:** `Economy` + `Mission`/`MissionManager` (courier chains, markers), `Minimap` (2D ortho pass), `DayNightCycle`, `SaveGame` (properties).
+
+The car is a **third-party CC0 model** (Kenney "Car Kit") at `game/src/main/resources/models/car/` (`car.obj` + `colormap.png`, see `CREDITS.txt`), loaded via `Model`/`MtlLoader`. New game assets go under `game/src/main/resources/`; keep third-party assets CC0/permissive and record provenance in a `CREDITS.txt`. Reusable additions the game needed were pushed into `:engine` (e.g. `OrbitCamera`, `SpatialGrid`, `Collide.resolveCircle`, mouse-button input), not kept game-side.
 
 ### Uniform-name conventions (contract between engine and shaders)
 
