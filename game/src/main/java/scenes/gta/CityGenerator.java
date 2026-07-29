@@ -85,8 +85,13 @@ public final class CityGenerator {
 
                         byTint.get(rng.nextInt(PALETTE.length))
                                 .add(new Matrix4f().translate(cx, baseY + h / 2f, cz).scale(fw, h, fd));
-                        colliders.add(AABB.fromCenterSize(
-                                new Vector3f(cx, baseY + h / 2f, cz), new Vector3f(fw, h, fd)));
+                        // Collider spans from below ground to the roof, so a ground-walking
+                        // body (y ≈ [-1.6, 0.2]) clearly overlaps it. A fromCenterSize box at
+                        // baseY 0.2 only touched that body at a razor edge → on-foot collision
+                        // slipped through (driving was fine: resolveCircle ignores Y).
+                        colliders.add(new AABB(
+                                new Vector3f(cx - fw / 2f, -1f, cz - fd / 2f),
+                                new Vector3f(cx + fw / 2f, baseY + h, cz + fd / 2f)));
                     }
                 }
             }

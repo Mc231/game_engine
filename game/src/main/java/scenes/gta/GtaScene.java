@@ -509,12 +509,9 @@ public class GtaScene implements Scene {
                         ? "[F] enter car    LMB shoot    RMB/Q aim    WASD move"
                         : "LMB shoot    RMB/Q aim    WASD move    Shift run");
             hud.text(12, 64, 1.7f, hint, 0.75f, 0.85f, 0.9f);
-            // crosshair — tighter red reticle while aiming, faint white otherwise
-            float cx = fbw / 2f, cy = fbh / 2f;
+            // crosshair — only shown while aiming (no reticle on the character otherwise)
             if (aiming) {
-                hud.text(cx - 5f, cy - 9f, 2.6f, "o", 1f, 0.3f, 0.25f);
-            } else {
-                hud.text(cx - 4f, cy - 8f, 2f, "+", 0.85f, 0.85f, 0.85f);
+                hud.text(fbw / 2f - 5f, fbh / 2f - 9f, 2.6f, "o", 1f, 0.3f, 0.25f);
             }
         } else {
             hud.text(12, 40, 2f, "DRIVING   " + String.format("%.0f", Math.abs(car.speed()) * 3.6f) + " km/h"
