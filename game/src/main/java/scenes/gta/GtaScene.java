@@ -72,6 +72,7 @@ public class GtaScene implements Scene {
     private Vector3f[] lightNodes;      // intersection signal posts
     private Vector3f[] lampPosts;       // decorative street lamps
     private Mode mode = Mode.ON_FOOT;
+    private boolean aiming;
     private int pedsHit;
 
     // Combat.
@@ -205,15 +206,18 @@ public class GtaScene implements Scene {
         if (!weapon.tryFire()) {
             return;
         }
-        aim.set(camera.forwardXZ());   // copy: forwardXZ() returns an internal vector
-        Vector3f origin = new Vector3f(player.position().x, 1.5f, player.position().z);
+        // Shoot from the camera THROUGH the crosshair (screen center) so bullets
+        // land where the reticle points, not parallel-offset from it.
+        Vector3f origin = new Vector3f(camera.position());
+        aim.set(camera.aimDirection());
         AABB[] walls = city.wallsNear(player.position(), weapon.range());
         // Police take priority; otherwise a hit ped is a crime that raises the wanted level.
         boolean hitCop = police.shoot(origin, aim, weapon.range(), weapon.damage(), walls);
         if (!hitCop && peds.shoot(origin, aim, weapon.range(), weapon.damage(), walls)) {
             wanted.addCrime(20f);
         }
-        muzzlePos.set(origin.x + aim.x * 0.9f, 1.4f, origin.z + aim.z * 0.9f);
+        Vector3f fwd = camera.forwardXZ();
+        muzzlePos.set(player.position().x + fwd.x * 0.9f, 1.4f, player.position().z + fwd.z * 0.9f);
         flashTimer = 0.05f;
         gunshot.play();
     }
@@ -253,9 +257,9 @@ public class GtaScene implements Scene {
                 enterCar();
             }
             // Hold RMB to aim over-the-shoulder: shift the camera off the character + zoom in.
-            boolean aiming = input.isMouseButtonDown(GLFW_MOUSE_BUTTON_RIGHT);
-            camera.setShoulder(aiming ? 1.3f : 0f)
-                    .setDistance(aiming ? 4.2f : FOOT_DISTANCE)
+            aiming = input.isMouseButtonDown(GLFW_MOUSE_BUTTON_RIGHT);
+            camera.setShoulder(aiming ? 1.6f : 0f)
+                    .setDistance(aiming ? 4.0f : FOOT_DISTANCE)
                     .setTargetHeight(aiming ? 1.55f : FOOT_HEIGHT);
             camera.setBaseYaw(0f);
             camera.update(player.position(), deltaSeconds, near);
@@ -496,9 +500,13 @@ public class GtaScene implements Scene {
             String hint = car.nearSeat(player.position())
                     ? "[F] enter car    LMB shoot  RMB aim    WASD move" : "LMB shoot   RMB aim   WASD move   Shift run";
             hud.text(12, 64, 1.7f, hint, 0.75f, 0.85f, 0.9f);
-            // crosshair
+            // crosshair — tighter red reticle while aiming, faint white otherwise
             float cx = fbw / 2f, cy = fbh / 2f;
-            hud.text(cx - 4f, cy - 8f, 2.2f, "+", 1f, 1f, 1f);
+            if (aiming) {
+                hud.text(cx - 5f, cy - 9f, 2.6f, "o", 1f, 0.3f, 0.25f);
+            } else {
+                hud.text(cx - 4f, cy - 8f, 2f, "+", 0.85f, 0.85f, 0.85f);
+            }
         } else {
             hud.text(12, 40, 2f, "DRIVING   " + String.format("%.0f", Math.abs(car.speed()) * 3.6f) + " km/h"
                     + (pedsHit > 0 ? "     hits " + pedsHit : ""), 1f, 0.9f, 0.7f);

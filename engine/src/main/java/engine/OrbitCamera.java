@@ -47,6 +47,7 @@ public class OrbitCamera {
     private final Matrix4f view = new Matrix4f();
     private final Vector3f fwd = new Vector3f();
     private final Vector3f right = new Vector3f();
+    private final Vector3f aimDir = new Vector3f();
     private boolean initialized = false;
 
     /** Orbit the camera with mouse deltas (pitch is clamped). */
@@ -105,6 +106,20 @@ public class OrbitCamera {
     /** Camera world position (for {@code uViewPos}). */
     public Vector3f position() {
         return position;
+    }
+
+    /** The point the camera is centered on (screen center = crosshair). */
+    public Vector3f lookAt() {
+        return lookAt;
+    }
+
+    /**
+     * Normalized 3D direction from the camera through the crosshair (screen
+     * center). Cast a shot from {@link #position()} along this so bullets land
+     * where the reticle points, regardless of the shoulder offset.
+     */
+    public Vector3f aimDirection() {
+        return aimDir.set(lookAt).sub(position).normalize();
     }
 
     /** Unit "forward" move axis on XZ: into the screen, away from the camera. */
