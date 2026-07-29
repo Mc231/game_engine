@@ -39,6 +39,11 @@ public class OrbitCamera {
     private float collisionMargin = 0.35f;
     private float followLerp = 12f;       // higher = snappier follow
 
+    // Aim mode: a free-pitching over-the-shoulder view (so shots can angle up/down).
+    private boolean aiming = false;
+    private float aimPitch = 0.1f;        // radians; + = aim up (its own mouse-Y axis)
+    private static final float AIM_MIN = -0.7f, AIM_MAX = 1.1f;
+
     // Working state.
     private final Vector3f position = new Vector3f();
     private final Vector3f lookAt = new Vector3f();
@@ -48,13 +53,23 @@ public class OrbitCamera {
     private final Vector3f fwd = new Vector3f();
     private final Vector3f right = new Vector3f();
     private final Vector3f aimDir = new Vector3f();
+    private final Vector3f tmpDir = new Vector3f();
     private boolean initialized = false;
 
-    /** Orbit the camera with mouse deltas (pitch is clamped). */
+    /** Orbit/aim with mouse deltas. In aim mode the Y axis pitches the aim freely. */
     public void addLook(float mouseDeltaX, float mouseDeltaY) {
         yaw += mouseDeltaX * sensitivity;
-        pitch += mouseDeltaY * sensitivity;
-        pitch = Math.max(minPitch, Math.min(maxPitch, pitch));
+        if (aiming) {
+            aimPitch = Math.max(AIM_MIN, Math.min(AIM_MAX, aimPitch + mouseDeltaY * sensitivity));
+        } else {
+            pitch = Math.max(minPitch, Math.min(maxPitch, pitch + mouseDeltaY * sensitivity));
+        }
+    }
+
+    /** Toggle over-the-shoulder aim mode (free vertical aim). */
+    public OrbitCamera setAim(boolean aiming) {
+        this.aiming = aiming;
+        return this;
     }
 
     /**
@@ -62,14 +77,46 @@ public class OrbitCamera {
      * blocks the view. Pass {@code dt} for smoothing; {@code walls} may be null.
      */
     public void update(Vector3f target, float dt, AABB[] walls) {
+        float a = yaw + baseYaw;
+
+        if (aiming) {
+            // View direction = horizontal "into screen" forward tilted by aimPitch.
+            float cq = (float) Math.cos(aimPitch), sq = (float) Math.sin(aimPitch);
+            aimDir.set(-(float) Math.sin(a) * cq, sq, -(float) Math.cos(a) * cq).normalize();
+            // Pivot at the shooter's shoulder; camera sits behind along -aimDir.
+            Vector3f r = rightXZ();
+            lookAt.set(target.x + r.x * shoulder, target.y + targetHeight, target.z + r.z * shoulder);
+            float dist = distance;
+            if (walls != null && walls.length > 0) {
+                tmpDir.set(aimDir).mul(-1f);
+                Ray ray = new Ray(lookAt, tmpDir);
+                float nearest = distance;
+                for (AABB w : walls) {
+                    float t = Intersect.rayAABB(ray, w);
+                    if (t >= 0f && t < nearest) {
+                        nearest = t;
+                    }
+                }
+                dist = Math.max(minDistance, nearest - collisionMargin);
+            }
+            desired.set(lookAt.x - aimDir.x * dist, lookAt.y - aimDir.y * dist, lookAt.z - aimDir.z * dist);
+            if (!initialized) {
+                position.set(desired);
+                initialized = true;
+            } else {
+                position.lerp(desired, Math.min(dt * followLerp, 1f));
+            }
+            lookAt.set(position).add(aimDir);   // look ALONG aimDir → crosshair = aimDir
+            return;
+        }
+
         lookAt.set(target.x, target.y + targetHeight, target.z);
-        if (shoulder != 0f) {                 // shift the look point sideways (over-the-shoulder aim)
+        if (shoulder != 0f) {                 // shift the look point sideways
             Vector3f r = rightXZ();
             lookAt.x += r.x * shoulder;
             lookAt.z += r.z * shoulder;
         }
 
-        float a = yaw + baseYaw;
         float cp = (float) Math.cos(pitch);
         float sp = (float) Math.sin(pitch);
         float ox = (float) Math.sin(a) * cp;   // offset direction from look point

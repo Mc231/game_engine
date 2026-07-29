@@ -258,7 +258,8 @@ public class GtaScene implements Scene {
             }
             // Hold RMB to aim over-the-shoulder: shift the camera off the character + zoom in.
             aiming = input.isMouseButtonDown(GLFW_MOUSE_BUTTON_RIGHT);
-            camera.setShoulder(aiming ? 1.6f : 0f)
+            camera.setAim(aiming)
+                    .setShoulder(aiming ? 1.6f : 0f)
                     .setDistance(aiming ? 4.0f : FOOT_DISTANCE)
                     .setTargetHeight(aiming ? 1.55f : FOOT_HEIGHT);
             camera.setBaseYaw(0f);
@@ -325,7 +326,8 @@ public class GtaScene implements Scene {
 
     private void enterCar() {
         mode = Mode.DRIVING;
-        camera.setShoulder(0f).setDistance(CAR_DISTANCE).setTargetHeight(CAR_HEIGHT).resetYaw();
+        aiming = false;
+        camera.setAim(false).setShoulder(0f).setDistance(CAR_DISTANCE).setTargetHeight(CAR_HEIGHT).resetYaw();
     }
 
     private void exitCar() {
