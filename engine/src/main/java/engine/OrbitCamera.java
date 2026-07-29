@@ -80,15 +80,21 @@ public class OrbitCamera {
         float a = yaw + baseYaw;
 
         if (aiming) {
-            // View direction = horizontal "into screen" forward tilted by aimPitch.
+            // View/shot direction = horizontal "into screen" forward tilted by aimPitch.
             float cq = (float) Math.cos(aimPitch), sq = (float) Math.sin(aimPitch);
             aimDir.set(-(float) Math.sin(a) * cq, sq, -(float) Math.cos(a) * cq).normalize();
-            // Pivot at the shooter's shoulder; camera sits behind along -aimDir.
+
+            // Pivot at the shooter's shoulder.
             Vector3f r = rightXZ();
             lookAt.set(target.x + r.x * shoulder, target.y + targetHeight, target.z + r.z * shoulder);
+
+            // The camera sits BEHIND (horizontal, yaw only) at head height — it does
+            // NOT move with the aim pitch, so aiming up/down rotates the view instead
+            // of flinging the camera underground or into the sky.
+            float bx = (float) Math.sin(a), bz = (float) Math.cos(a);   // horizontal "behind"
             float dist = distance;
             if (walls != null && walls.length > 0) {
-                tmpDir.set(aimDir).mul(-1f);
+                tmpDir.set(bx, 0.2f, bz);
                 Ray ray = new Ray(lookAt, tmpDir);
                 float nearest = distance;
                 for (AABB w : walls) {
@@ -99,7 +105,7 @@ public class OrbitCamera {
                 }
                 dist = Math.max(minDistance, nearest - collisionMargin);
             }
-            desired.set(lookAt.x - aimDir.x * dist, lookAt.y - aimDir.y * dist, lookAt.z - aimDir.z * dist);
+            desired.set(lookAt.x + bx * dist, lookAt.y + 0.3f, lookAt.z + bz * dist);
             if (!initialized) {
                 position.set(desired);
                 initialized = true;
